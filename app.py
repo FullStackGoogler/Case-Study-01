@@ -23,7 +23,7 @@ def get_model():
 
 @st.cache_data
 def generate_embeddings(df, _model):
-    df['embeddings'] = df['combined_text'].apply(lambda x: model.encode(x, convert_to_tensor=True))
+    df['embeddings'] = df['combined_text'].apply(lambda x: _model.encode(x, convert_to_tensor=True))
     return df
 
 # Recommender function to find the most similar games
