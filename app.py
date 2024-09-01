@@ -5,7 +5,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import gradio as gr
 
 # Load the dataset
-df = pd.read_csv('path_to_steam_dataset.csv')
+df = pd.read_csv('games.csv')
 
 # Initialize the tokenizer and model
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
