@@ -11,10 +11,6 @@ df = pd.read_csv('games.csv')
 df['About the game'] = df['About the game'].fillna('')  # Replace NaNs with empty strings
 df['About the game'] = df['About the game'].astype(str)  # Convert all entries to strings
 
-# Apply embeddings
-df['embeddings'] = df['About the game'].apply(get_embeddings)
-
-
 # Initialize the tokenizer and model
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 model = DistilBertModel.from_pretrained('distilbert-base-uncased')
