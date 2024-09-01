@@ -1,9 +1,10 @@
 import pandas as pd
-from transformers import DistilBertTokenizer, DistilBertModel
-import torch
+from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import streamlit as st
 import numpy as np
+import pickle
+import os
 
 # Streamlit app title
 st.title('Game Recommender App')
@@ -23,38 +24,63 @@ except Exception as e:
 if 'About the game' not in df.columns:
     st.write("Error: 'About the game' column is missing.")
 else:
-    df['About the game'] = df['About the game'].fillna('')  # Replace NaNs with empty strings
-    df['About the game'] = df['About the game'].astype(str)  # Convert all entries to strings
+    df['About the game'] = df['About the game'].fillna('')
+    df['About the game'] = df['About the game'].astype(str)
     st.write("Dataset preprocessing complete.")
 
-# Initialize the tokenizer and model with debugging
-st.write("Initializing tokenizer and model...")
+# Initialize the model with debugging
+st.write("Initializing model...")
 try:
-    tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
-    model = DistilBertModel.from_pretrained('distilbert-base-uncased')
-    st.write("Tokenizer and model loaded successfully.")
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    st.write("Model loaded successfully.")
 except Exception as e:
-    st.write(f"Error loading tokenizer/model: {e}")
+    st.write(f"Error loading model: {e}")
 
-def get_embeddings(text):
-    if not isinstance(text, str) or not text.strip():
-        return np.zeros((768,))  # Return a zero vector if text is invalid
+def get_embeddings(texts):
+    if not isinstance(texts, list) or not all(isinstance(text, str) for text in texts):
+        return np.zeros((384,))  # Return a zero vector if input is invalid
+    
     try:
-        inputs = tokenizer(text, return_tensors='pt', truncation=True, padding=True)
-        with torch.no_grad():
-            outputs = model(**inputs)
-        return outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
+        embeddings = model.encode(texts, show_progress_bar=True)
+        return embeddings  # Returns a numpy array of shape (batch_size, 384)
     except Exception as e:
         st.write(f"Error in get_embeddings function: {e}")
-        return np.zeros((768,))  # Return a zero vector if an error occurs
+        return np.zeros((384,))  # Return a zero vector if an error occurs
 
-# Apply embeddings to each game with debugging
-st.write("Computing embeddings...")
-try:
-    df['embeddings'] = df['About the game'].apply(get_embeddings)
-    st.write("Embeddings computed successfully.")
-except Exception as e:
-    st.write(f"Error computing embeddings: {e}")
+# Compute and save embeddings
+def compute_and_save_embeddings():
+    st.write("Computing embeddings...")
+    try:
+        batch_size = 32
+        embeddings_list = []
+        for i in range(0, len(df), batch_size):
+            batch_texts = df['About the game'].iloc[i:i+batch_size].tolist()
+            embeddings = get_embeddings(batch_texts)
+            embeddings_list.extend(embeddings)
+        df['embeddings'] = embeddings_list
+
+        with open('embeddings.pkl', 'wb') as f:
+            pickle.dump(df[['Name', 'embeddings']], f)
+
+        st.write("Embeddings computed and saved successfully.")
+    except Exception as e:
+        st.write(f"Error computing and saving embeddings: {e}")
+
+# Load embeddings from file
+def load_embeddings():
+    try:
+        with open('embeddings.pkl', 'rb') as f:
+            saved_data = pickle.load(f)
+        return saved_data
+    except Exception as e:
+        st.write(f"Error loading embeddings: {e}")
+        return None
+
+# Check if embeddings file exists and load it
+if os.path.exists('embeddings.pkl'):
+    df = load_embeddings()
+else:
+    compute_and_save_embeddings()
 
 def get_similar_games(game_name, top_n=5):
     try:
