@@ -47,16 +47,19 @@ def get_embeddings(texts):
         st.write(f"Error in get_embeddings function: {e}")
         return np.zeros((384,))  # Return a zero vector if an error occurs
 
-# Compute and save embeddings
 def compute_and_save_embeddings():
     st.write("Computing embeddings...")
     try:
-        batch_size = 32
+        # Using a larger batch size for efficiency
+        batch_size = 128
         embeddings_list = []
-        for i in range(0, len(df), batch_size):
-            batch_texts = df['About the game'].iloc[i:i+batch_size].tolist()
+        num_batches = len(df) // batch_size + int(len(df) % batch_size > 0)
+        
+        for i in range(num_batches):
+            batch_texts = df['About the game'].iloc[i*batch_size:(i+1)*batch_size].tolist()
             embeddings = get_embeddings(batch_texts)
             embeddings_list.extend(embeddings)
+
         df['embeddings'] = embeddings_list
 
         with open('embeddings.pkl', 'wb') as f:
@@ -66,7 +69,6 @@ def compute_and_save_embeddings():
     except Exception as e:
         st.write(f"Error computing and saving embeddings: {e}")
 
-# Load embeddings from file
 def load_embeddings():
     try:
         with open('embeddings.pkl', 'rb') as f:
@@ -76,7 +78,7 @@ def load_embeddings():
         st.write(f"Error loading embeddings: {e}")
         return None
 
-# Check if embeddings file exists and load it
+# Check and load/save embeddings
 if os.path.exists('embeddings.pkl'):
     df = load_embeddings()
 else:
@@ -84,9 +86,13 @@ else:
 
 def get_similar_games(game_name, top_n=5):
     try:
-        game_idx = df[df['Name'] == game_name].index[0]
-        game_embedding = df.loc[game_idx, 'embeddings'].reshape(1, -1)
-        similarities = cosine_similarity(game_embedding, list(df['embeddings']))
+        selected_game_description = df[df['Name'] == game_name]['About the game'].values[0]
+        game_embedding = get_embeddings([selected_game_description]).reshape(1, -1)
+
+        all_game_descriptions = df['About the game'].tolist()
+        all_embeddings = get_embeddings(all_game_descriptions)
+
+        similarities = cosine_similarity(game_embedding, all_embeddings)
         similar_indices = similarities[0].argsort()[-top_n:][::-1]
         return df.iloc[similar_indices]
     except Exception as e:
