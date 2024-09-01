@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from transformers import DistilBertTokenizer, DistilBertModel
 import torch
 from sklearn.metrics.pairwise import cosine_similarity
