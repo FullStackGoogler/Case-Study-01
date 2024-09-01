@@ -19,7 +19,7 @@ from sentence_transformers import SentenceTransformer, util
 def data_processing():
 
     # loading the data and preparing it
-    games = pd.read_csv('./games.csv').drop('Unnamed: 0', axis=1)
+    games = pd.read_csv('./games.csv') #.drop('Unnamed: 0', axis=1)
     
     # some duplicate rows
     games.drop_duplicates(inplace=True)
