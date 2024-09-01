@@ -17,23 +17,42 @@ from sentence_transformers import SentenceTransformer, util
 
 @st.cache_data
 def data_processing():
-
-    # loading the data and preparing it
-    games = pd.read_csv('./games.csv') #.drop('Unnamed: 0', axis=1)
+    # Load the new CSV file
+    games = pd.read_csv('./games.csv')
     
-    # some duplicate rows
+    # Rename columns to match the original code
+    games.rename(columns={
+        'Name': 'Title',
+        'Release date': 'Release Date',
+        'Publishers': 'Team',
+        'Developers': 'Team',
+        'Genres': 'Genres',
+        'Tags': 'Genres',
+        'About the game': 'Summary'
+    }, inplace=True)
+    
+    # Drop any duplicate rows
     games.drop_duplicates(inplace=True)
-
-    # deal with apostrophes
-    games['fixed_title'] = games.Title.str.replace(r"'", "")
-
-    # dropping weird dates and null values
-    games[['date','year']] = games['Release Date'].str.split(',',expand=True)
-    games.year.dropna(inplace=True)
-    games = games[games["Release Date"] != "releases on TBD"]
     
-    games['year'] = games['year'].astype(int)
-
+    # Handle apostrophes in titles
+    games['fixed_title'] = games.Title.str.replace(r"'", "", regex=True)
+    
+    # Convert release dates and handle null values
+    # Assuming 'Release Date' is in a format like 'dd-mmm-yy' or 'yyyy-mm-dd'
+    # Convert 'Release Date' to a datetime object
+    games['Release Date'] = pd.to_datetime(games['Release Date'], errors='coerce')
+    
+    # Extract year from the 'Release Date'
+    games['year'] = games['Release Date'].dt.year
+    
+    # Drop rows where year is missing or Release Date is 'releases on TBD'
+    games = games.dropna(subset=['year'])
+    games = games[games['Release Date'].notnull()]
+    
+    # Keep only games released in the last 3 years
+    five_years_before = datetime.now().year - 3
+    games = games[games['year'] > five_years_before]
+    
     return games
 
 
