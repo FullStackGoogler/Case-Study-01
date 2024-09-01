@@ -2,7 +2,7 @@ import pandas as pd
 from transformers import DistilBertTokenizer, DistilBertModel
 import torch
 from sklearn.metrics.pairwise import cosine_similarity
-import gradio as gr
+import streamlit as st
 
 # Load the dataset
 df = pd.read_csv('games.csv')
@@ -27,18 +27,14 @@ def get_similar_games(game_name, top_n=5):
     similar_indices = similarities[0].argsort()[-top_n:][::-1]
     return df.iloc[similar_indices]
 
-def recommend_games(selected_game):
-    similar_games = get_similar_games(selected_game)
-    return similar_games[['Name', 'Short description of the game']]
+# Streamlit app
+st.title('Game Recommender App')
 
-# List of game names for the dropdown
+# Dropdown for game selection
 game_names = df['Name'].tolist()
+selected_game = st.selectbox('Select a Game', game_names)
 
-# Create Gradio interface
-interface = gr.Interface(
-    fn=recommend_games,
-    inputs=gr.Dropdown(game_names, label="Select a Game"),
-    outputs=gr.Dataframe(headers=['Game Name', 'Description'])
-)
-
-interface.launch()
+if selected_game:
+    similar_games = get_similar_games(selected_game)
+    st.write(f"### Recommended Games similar to `{selected_game}`")
+    st.dataframe(similar_games[['Name', 'Short description of the game']])
