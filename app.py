@@ -22,7 +22,7 @@ def get_model():
     return SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
 @st.cache_data
-def generate_embeddings(df, model):
+def generate_embeddings(df, _model):
     df['embeddings'] = df['combined_text'].apply(lambda x: model.encode(x, convert_to_tensor=True))
     return df
 
