@@ -7,15 +7,26 @@ import streamlit as st
 # Load the dataset
 df = pd.read_csv('games.csv')
 
+# Ensure no missing or invalid entries
+df['About the game'] = df['About the game'].fillna('')  # Replace NaNs with empty strings
+df['About the game'] = df['About the game'].astype(str)  # Convert all entries to strings
+
+# Apply embeddings
+df['embeddings'] = df['About the game'].apply(get_embeddings)
+
+
 # Initialize the tokenizer and model
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 model = DistilBertModel.from_pretrained('distilbert-base-uncased')
 
 def get_embeddings(text):
+    if not isinstance(text, str) or not text.strip():
+        return np.zeros((768,))  # Return a zero vector or handle the case as needed
     inputs = tokenizer(text, return_tensors='pt', truncation=True, padding=True)
     with torch.no_grad():
         outputs = model(**inputs)
     return outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
+
 
 # Apply embeddings to each game
 df['embeddings'] = df['About the game'].apply(get_embeddings)
