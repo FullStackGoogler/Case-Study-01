@@ -23,6 +23,8 @@ def get_model():
 
 @st.cache_data
 def generate_embeddings(df, _model):
+    # Ensure all values in 'combined_text' are strings and replace NaN with an empty string
+    df['combined_text'] = df['combined_text'].fillna('').astype(str)
     df['embeddings'] = df['combined_text'].apply(lambda x: _model.encode(x, convert_to_tensor=True))
     return df
 
