@@ -6,7 +6,17 @@ from sklearn.metrics.pairwise import cosine_similarity
 import streamlit as st
 
 # Load the dataset
-df = pd.read_csv('games.csv')
+#df = pd.read_csv('games.csv')
+# Load the dataset with debugging
+st.write("Loading dataset...")
+try:
+    df = pd.read_csv('games.csv')
+    st.write("Dataset loaded successfully.")
+    st.write(f"Dataframe shape: {df.shape}")
+    st.write("First few rows of the dataset:")
+    st.write(df.head())
+except Exception as e:
+    st.write(f"Error loading dataset: {e}")
 
 # Ensure no missing or invalid entries
 df['About the game'] = df['About the game'].fillna('')  # Replace NaNs with empty strings
