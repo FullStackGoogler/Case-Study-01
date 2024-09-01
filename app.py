@@ -1,117 +1,65 @@
+import streamlit as st
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-import streamlit as st
-import numpy as np
-import pickle
-import os
+import torch
 
-# Streamlit app title
-st.title('Game Recommender App')
-
-# Load the dataset with debugging
-st.write("Loading dataset...")
-try:
+# Load the dataset
+@st.cache_data
+def load_data():
     df = pd.read_csv('games.csv')
-    st.write("Dataset loaded successfully.")
-    st.write(f"Dataframe shape: {df.shape}")
-    st.write("First few rows of the dataset:")
-    st.write(df.head())
-except Exception as e:
-    st.write(f"Error loading dataset: {e}")
+    return df
 
-# Ensure 'About the game' column exists and is correctly formatted
-if 'About the game' not in df.columns:
-    st.write("Error: 'About the game' column is missing.")
-else:
-    df['About the game'] = df['About the game'].fillna('')
-    df['About the game'] = df['About the game'].astype(str)
-    st.write("Dataset preprocessing complete.")
+# Preprocess the dataset to combine relevant text columns
+@st.cache_data
+def preprocess_data(df):
+    df['combined_text'] = df['Name'] + ' ' + df['About the game'] + ' ' + df['Genres'] + ' ' + df['Tags'] + ' ' + df['Developers'] + ' ' + df['Publishers']
+    return df
 
-# Initialize the model with debugging
-st.write("Initializing model...")
-try:
-    model = SentenceTransformer('all-MiniLM-L6-v2')
-    st.write("Model loaded successfully.")
-except Exception as e:
-    st.write(f"Error loading model: {e}")
+# Generate embeddings using the all-MiniLM-L6-v2 model
+@st.cache_resource
+def get_model():
+    return SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
-def get_embeddings(texts):
-    if not isinstance(texts, list) or not all(isinstance(text, str) for text in texts):
-        return np.zeros((384,))  # Return a zero vector if input is invalid
-    
-    try:
-        embeddings = model.encode(texts, show_progress_bar=True)
-        return embeddings  # Returns a numpy array of shape (batch_size, 384)
-    except Exception as e:
-        st.write(f"Error in get_embeddings function: {e}")
-        return np.zeros((384,))  # Return a zero vector if an error occurs
+@st.cache_data
+def generate_embeddings(df, model):
+    df['embeddings'] = df['combined_text'].apply(lambda x: model.encode(x, convert_to_tensor=True))
+    return df
 
-def compute_and_save_embeddings():
-    st.write("Computing embeddings...")
-    try:
-        # Using a larger batch size for efficiency
-        batch_size = 128
-        embeddings_list = []
-        num_batches = len(df) // batch_size + int(len(df) % batch_size > 0)
-        
-        for i in range(num_batches):
-            batch_texts = df['About the game'].iloc[i*batch_size:(i+1)*batch_size].tolist()
-            embeddings = get_embeddings(batch_texts)
-            embeddings_list.extend(embeddings)
+# Recommender function to find the most similar games
+def recommend_games(input_game_name, df, top_n=10):
+    # Find the input game's embedding
+    input_game_embedding = df[df['Name'] == input_game_name]['embeddings'].values[0]
 
-        df['embeddings'] = embeddings_list
+    # Compute cosine similarity with all other games
+    similarities = df['embeddings'].apply(lambda x: cosine_similarity(x.unsqueeze(0), input_game_embedding.unsqueeze(0)).item())
 
-        with open('embeddings.pkl', 'wb') as f:
-            pickle.dump(df[['Name', 'embeddings']], f)
+    # Sort by similarity and return the top N results
+    df['similarity'] = similarities
+    recommendations = df.sort_values(by='similarity', ascending=False).head(top_n + 1)  # +1 to exclude the input game itself
+    return recommendations[['Name', 'Genres', 'Tags', 'similarity']]
 
-        st.write("Embeddings computed and saved successfully.")
-    except Exception as e:
-        st.write(f"Error computing and saving embeddings: {e}")
+# Streamlit app
+def main():
+    st.title("Game Recommender System")
 
-def load_embeddings():
-    try:
-        with open('embeddings.pkl', 'rb') as f:
-            saved_data = pickle.load(f)
-        return saved_data
-    except Exception as e:
-        st.write(f"Error loading embeddings: {e}")
-        return None
+    # Load and preprocess data
+    df = load_data()
+    df = preprocess_data(df)
 
-# Check and load/save embeddings
-if os.path.exists('embeddings.pkl'):
-    df = load_embeddings()
-else:
-    compute_and_save_embeddings()
+    # Load model and generate embeddings
+    model = get_model()
+    df = generate_embeddings(df, model)
 
-def get_similar_games(game_name, top_n=5):
-    try:
-        selected_game_description = df[df['Name'] == game_name]['About the game'].values[0]
-        game_embedding = get_embeddings([selected_game_description]).reshape(1, -1)
+    # User input for the game name
+    game_name = st.selectbox("Select a game", df['Name'].unique())
 
-        all_game_descriptions = df['About the game'].tolist()
-        all_embeddings = get_embeddings(all_game_descriptions)
+    # Show recommendations when the button is clicked
+    if st.button("Find Similar Games"):
+        recommendations = recommend_games(game_name, df)
+        st.write("Top 10 similar games:")
+        for index, row in recommendations.iterrows():
+            st.write(f"{index+1}. **{row['Name']}** - Genres: {row['Genres']} - Similarity: {row['similarity']:.4f}")
 
-        similarities = cosine_similarity(game_embedding, all_embeddings)
-        similar_indices = similarities[0].argsort()[-top_n:][::-1]
-        return df.iloc[similar_indices]
-    except Exception as e:
-        st.write(f"Error in get_similar_games function: {e}")
-        return pd.DataFrame()  # Return an empty DataFrame if an error occurs
-
-# Dropdown for game selection with debugging
-st.write("Creating dropdown menu...")
-game_names = df['Name'].tolist() if 'Name' in df.columns else []
-selected_game = st.selectbox('Select a Game', game_names)
-
-if selected_game:
-    st.write(f"Selected Game: {selected_game}")
-    try:
-        similar_games = get_similar_games(selected_game)
-        if not similar_games.empty:
-            st.write(f"### Recommended Games similar to `{selected_game}`")
-            st.dataframe(similar_games[['Name', 'Short description of the game']])
-        else:
-            st.write("No similar games found.")
-    except Exception as e:
-        st.write(f"Error retrieving similar games: {e}")
+if __name__ == "__main__":
+    main()
