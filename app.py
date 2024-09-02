@@ -35,11 +35,15 @@ def data_processing():
     games.drop_duplicates(inplace=True)
     
     # Handle apostrophes in titles
-    games['fixed_title'] = games['Title'].astype(str).str.replace(r"'", "", regex=True)
+    games['fixed_title'] = games.Title.astype(str).str.replace(r"'", "", regex=True)
+    
+    # Print column types and sample values for debugging
+    print("Columns and their types:")
+    print(games.dtypes)
+    print("\nSample values:")
+    print(games.head())
     
     # Convert release dates and handle null values
-    # Assuming 'Release Date' is in a format like 'dd-mmm-yy' or 'yyyy-mm-dd'
-    # Convert 'Release Date' to a datetime object
     games['Release Date'] = pd.to_datetime(games['Release Date'], errors='coerce')
     
     # Extract year from the 'Release Date'
@@ -54,6 +58,7 @@ def data_processing():
     games = games[games['year'] > five_years_before]
     
     return games
+
 
 
 #@st.cache_resource
@@ -130,6 +135,7 @@ option = st.selectbox(
     'Select a game',
     games.Title.sort_values().unique(), placeholder="Choose your game", index=None)
 
+
 # button to 'start' the app functions
 # after clicking it, sets stage to 1: is running set_stage function with argument 1
 find_me = st.button("Find a similar game!",on_click=set_stage, args=(1,))
@@ -147,6 +153,12 @@ if st.session_state.stage > 0:
         st.write('Reselect a game, please')
         set_stage(0)
 
+    print("\nDebugging Information:")
+    print(f"Type of fixed_title column: {games['fixed_title'].dtype}")
+    print(f"Type of option variable: {type(option)}")
+    print(f"Value of option variable: {option}")
+    print(f"Sample values from fixed_title column:")
+    print(games['fixed_title'].head())
 
     filtered = games.query('fixed_title == @option')
 
