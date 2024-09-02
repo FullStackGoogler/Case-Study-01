@@ -38,7 +38,6 @@ def data_processing():
     # Display the number of removed entries
     st.write(f"Number of games removed due to 'Sexual Content': {removed_count}")
     st.write(f"Number of games with 90%+ review ratings: {remaining_count}")
-    st.write(f"Number of games with 1000+ revcommenationds: {after_recommendations_filter}")
     
     # Rename columns to match the original code
     games.rename(columns={
