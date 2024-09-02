@@ -91,7 +91,7 @@ def calculate_similarities(name, data_original, data_filtered):
     data_original.drop(data_original.query('Title == @name').index, inplace=True)
     
     # Filter games from the last 3 years
-    five_years_before = datetime.now().year - 3
+    five_years_before = datetime.now().year - 7
     games_filtered = data_original.query(f'year > {five_years_before}')
 
     result = data_filtered
