@@ -73,6 +73,8 @@ def calculate_similarities(name, data_original, data_filtered):
     # Filter games from the last 3 years
     five_years_before = datetime.now().year - 3
     games_filtered = data_original.query(f'year > {five_years_before}')
+
+    result = data_filtered
     
     # Take the summary of the selected game and transform it to a single string
     summary_selected_game = re.sub(r'\s{2,}', '', str(result.Summary.item()).replace('\n', ' '), flags=re.MULTILINE)
