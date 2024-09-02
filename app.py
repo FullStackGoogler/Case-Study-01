@@ -49,7 +49,7 @@ def data_processing():
         'Release date': 'Release Date',
         'Publishers': 'Team',
         'Developers': 'Team',
-        'Genres': 'Genres',
+        #'Genres': 'Genres',
         #'Tags': 'Genres',
         'About the game': 'Summary'
     }, inplace=True)
@@ -85,9 +85,6 @@ def data_processing():
     
     return games
 
-
-
-
 #@st.cache_resource
 def calculate_similarities(name, data_original, data_filtered):
     # Drop the games that were selected
@@ -99,39 +96,50 @@ def calculate_similarities(name, data_original, data_filtered):
 
     result = data_filtered
     
-    # Take the summary of the selected game and transform it to a single string
-    summary_selected_game = re.sub(r'\s{2,}', '', str(result.Summary.item()).replace('\n', ' '), flags=re.MULTILINE)
+    # Gather terms from Categories, Genres, and Tags and concatenate them into one string
+    selected_game_terms = ' '.join(
+        str(result.Categories.item()) + ' ' +
+        str(result.Genres.item()) + ' ' +
+        str(result.Tags.item())
+    )
     
-    # Transform all summaries into a list of strings
-    summaries_all_games = games_filtered['Summary'].fillna('').str.replace(r'[\n\s]{2,}', ' ', regex=True).values.tolist()
+    # Concatenate the terms for all games in the filtered set
+    all_game_terms = games_filtered.apply(
+        lambda row: ' '.join([
+            str(row['Categories']),
+            str(row['Genres']),
+            str(row['Tags'])
+        ]),
+        axis=1
+    ).tolist()
     
-    # Ensure all summaries are strings
-    summaries_all_games = [str(summary) for summary in summaries_all_games]
+    # Ensure all terms are strings
+    all_game_terms = [str(terms) for terms in all_game_terms]
     
     # Debugging step to find non-string values
-    for i, summary in enumerate(summaries_all_games):
-        if not isinstance(summary, str):
-            print(f"Non-string value detected at index {i}: {summary} (type: {type(summary)})")
+    for i, terms in enumerate(all_game_terms):
+        if not isinstance(terms, str):
+            print(f"Non-string value detected at index {i}: {terms} (type: {type(terms)})")
     
     # Run the model
     model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
     
     # Compute embeddings
-    embedding_1 = model.encode(summary_selected_game, convert_to_tensor=True)
-    embedding_2 = model.encode(summaries_all_games, convert_to_tensor=True)
+    embedding_1 = model.encode(selected_game_terms, convert_to_tensor=True)
+    embedding_2 = model.encode(all_game_terms, convert_to_tensor=True)
     
     # Compute similarity
     similarity = util.pytorch_cos_sim(embedding_1, embedding_2)
     
     # Add similarity scores back to the DataFrame
     games_filtered['similarity'] = similarity[0].tolist()
-    games_filtered['summary_fixed'] = games_filtered['Summary'].str.replace(r'[\n\s]{2,}', ' ', regex=True)
     
     # Order the DataFrame based on the similarity scores
     top5 = games_filtered.sort_values(by='similarity', ascending=False)[:5]
     
     st.write(f'\n These are the 5 most similar games to {name}:')
-    st.dataframe(top5[['Title', 'summary_fixed']])
+    st.dataframe(top5[['Title', 'similarity']])
+
 
 
 
