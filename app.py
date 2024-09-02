@@ -19,6 +19,11 @@ from sentence_transformers import SentenceTransformer, util
 def data_processing():
     # Load the new CSV file
     games = pd.read_csv('./games.csv')
+
+    # Filter out games with "Sexual Content" in the Tags column
+    initial_count = len(games)
+    games = games[~games['Tags'].str.contains('Sexual Content', na=False)]
+    removed_count = initial_count - len(games)
     
     # Rename columns to match the original code
     games.rename(columns={
@@ -55,11 +60,6 @@ def data_processing():
     # Drop rows where year is missing or Release Date is 'releases on TBD'
     games = games.dropna(subset=['year'])
     games = games[games['Release Date'].notnull()]
-
-    # Filter out games with "Sexual Content" in the Tags column
-    initial_count = len(games)
-    games = games[~games['Tags'].str.contains('Sexual Content', na=False)]
-    removed_count = initial_count - len(games)
 
     # Display the number of removed entries
     st.write(f"Number of games removed due to 'Sexual Content': {removed_count}")
