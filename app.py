@@ -67,46 +67,47 @@ def data_processing():
 
 #@st.cache_resource
 def calculate_similarities(name, data_original, data_filtered):
-
-    # subsetting 5 years - this will be the one searched - could add functionality
-    five_years_before = datetime.now().year - 3
-
-    # drop the games that were selected
-    data_original.drop(data_original.query('Title == @name').index)
-
-    games_filtered = data_original.query(f'year > {five_years_before}')
-
-    result = data_filtered
-
-    # Take the summary of the game and transform to string
-    summary_selected_game = re.sub(r'\s{2,}', '', result.Summary.item().replace('\n', ' '), flags=re.MULTILINE)
-
-    # transform all the column Summary into strings, as a list, obeying the order of the table
-    summaries_all_games = games_filtered.Summary.str.replace(r'[\n\s]{2,}', ' ', regex=True).values.tolist()
-
-    # run the model
-
-
-    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-
-    #Compute embedding for both lists
-    embedding_1= model.encode(summary_selected_game, convert_to_tensor=True)
-    embedding_2 = model.encode(summaries_all_games, convert_to_tensor=True)
-
-    similarity = util.pytorch_cos_sim(embedding_1, embedding_2)
-
+    # Drop the games that were selected
+    data_original.drop(data_original.query('Title == @name').index, inplace=True)
     
-    # place it back in the dataset
-    games_filtered.loc[:,'similarity'] = similarity[0].tolist()
-
-    games_filtered['summary_fixed'] = games_filtered.Summary.str.replace(r'[\n\s]{2,}', ' ', regex=True)
-
-    # order the dataset based on the score
-    # output the game.Title based on the input from user
+    # Filter games from the last 3 years
+    five_years_before = datetime.now().year - 3
+    games_filtered = data_original.query(f'year > {five_years_before}')
+    
+    # Take the summary of the selected game and transform it to a single string
+    summary_selected_game = re.sub(r'\s{2,}', '', str(result.Summary.item()).replace('\n', ' '), flags=re.MULTILINE)
+    
+    # Transform all summaries into a list of strings
+    summaries_all_games = games_filtered['Summary'].fillna('').str.replace(r'[\n\s]{2,}', ' ', regex=True).values.tolist()
+    
+    # Ensure all summaries are strings
+    summaries_all_games = [str(summary) for summary in summaries_all_games]
+    
+    # Debugging step to find non-string values
+    for i, summary in enumerate(summaries_all_games):
+        if not isinstance(summary, str):
+            print(f"Non-string value detected at index {i}: {summary} (type: {type(summary)})")
+    
+    # Run the model
+    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+    
+    # Compute embeddings
+    embedding_1 = model.encode(summary_selected_game, convert_to_tensor=True)
+    embedding_2 = model.encode(summaries_all_games, convert_to_tensor=True)
+    
+    # Compute similarity
+    similarity = util.pytorch_cos_sim(embedding_1, embedding_2)
+    
+    # Add similarity scores back to the DataFrame
+    games_filtered['similarity'] = similarity[0].tolist()
+    games_filtered['summary_fixed'] = games_filtered['Summary'].str.replace(r'[\n\s]{2,}', ' ', regex=True)
+    
+    # Order the DataFrame based on the similarity scores
     top5 = games_filtered.sort_values(by='similarity', ascending=False)[:5]
-
+    
     st.write(f'\n These are the 5 most similar games to {name}:')
-    st.dataframe(top5[['Title','summary_fixed']])
+    st.dataframe(top5[['Title', 'summary_fixed']])
+
 
 
 ############ App ############
