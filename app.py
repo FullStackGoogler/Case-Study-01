@@ -32,7 +32,7 @@ def data_processing():
         'Publishers': 'Team',
         'Developers': 'Team',
         'Genres': 'Genres',
-        'Tags': 'Genres',
+        #'Tags': 'Genres',
         'About the game': 'Summary'
     }, inplace=True)
     
