@@ -31,11 +31,14 @@ def data_processing():
         'About the game': 'Summary'
     }, inplace=True)
     
+    # Drop duplicate columns
+    games = games.loc[:, ~games.columns.duplicated()]
+    
     # Drop any duplicate rows
     games.drop_duplicates(inplace=True)
     
     # Handle apostrophes in titles
-    games['fixed_title'] = games.Title.astype(str).str.replace(r"'", "", regex=True)
+    games['fixed_title'] = games['Title'].astype(str).str.replace(r"'", "", regex=True)
     
     # Print column types and sample values for debugging
     print("Columns and their types:")
@@ -58,6 +61,7 @@ def data_processing():
     games = games[games['year'] > five_years_before]
     
     return games
+
 
 
 
@@ -160,8 +164,9 @@ if st.session_state.stage > 0:
     print(f"Sample values from fixed_title column:")
     print(games['fixed_title'].head())
 
-    filtered = games.query('fixed_title == @option')
-
+    #filtered = games.query('fixed_title == @option')
+    filtered = games.loc[games['fixed_title'] == option]
+    
     # some testing on the filtered data so the user can confirm the game
     if len(filtered) == 1:
         st.write('Is this the game you selected?')
