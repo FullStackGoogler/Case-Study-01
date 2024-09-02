@@ -24,6 +24,20 @@ def data_processing():
     initial_count = len(games)
     games = games[~games['Tags'].str.contains('Sexual Content', na=False)]
     removed_count = initial_count - len(games)
+
+    # 2. Calculate the positive rating percentage
+    filtered_games['positive_rating_percentage'] = filtered_games['Positive'] / (filtered_games['Positive'] + filtered_games['Negative']) * 100
+    
+    # 3. Filter for games with a positive rating percentage > 90%
+    final_filtered_games = filtered_games[filtered_games['positive_rating_percentage'] > 90]
+    
+    # Count how many are left
+    remaining_count = len(final_filtered_games)
+
+
+    # Display the number of removed entries
+    st.write(f"Number of games removed due to 'Sexual Content': {removed_count}")
+    st.write(f"Number of games with 90%+ review ratings: {remaining_count}")
     
     # Rename columns to match the original code
     games.rename(columns={
@@ -60,9 +74,6 @@ def data_processing():
     # Drop rows where year is missing or Release Date is 'releases on TBD'
     games = games.dropna(subset=['year'])
     games = games[games['Release Date'].notnull()]
-
-    # Display the number of removed entries
-    st.write(f"Number of games removed due to 'Sexual Content': {removed_count}")
     
     # Keep only games released in the last 3 years
     five_years_before = datetime.now().year - 3
