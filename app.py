@@ -35,7 +35,7 @@ def data_processing():
     games.drop_duplicates(inplace=True)
     
     # Handle apostrophes in titles
-    games['fixed_title'] = games.Title.str.replace(r"'", "", regex=True)
+    games['fixed_title'] = games['Title'].astype(str).str.replace(r"'", "", regex=True)
     
     # Convert release dates and handle null values
     # Assuming 'Release Date' is in a format like 'dd-mmm-yy' or 'yyyy-mm-dd'
