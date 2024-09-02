@@ -29,13 +29,10 @@ def data_processing():
     games['positive_rating_percentage'] = games['Positive'] / (games['Positive'] + games['Negative']) * 100
     
     # 3. Filter for games with a positive rating percentage > 90%
-    games = games[games['positive_rating_percentage'] > 85]
+    games = games[games['positive_rating_percentage'] > 75]
     
     # Count how many are left
     remaining_count = len(games)
-
-    games = games[games['Recommendations'] > 1000]
-    after_recommendations_filter = len(games)
 
 
     # Display the number of removed entries
