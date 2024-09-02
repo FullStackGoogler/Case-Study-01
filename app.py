@@ -26,13 +26,13 @@ def data_processing():
     removed_count = initial_count - len(games)
 
     # 2. Calculate the positive rating percentage
-    filtered_games['positive_rating_percentage'] = filtered_games['Positive'] / (filtered_games['Positive'] + filtered_games['Negative']) * 100
+    games['positive_rating_percentage'] = games['Positive'] / (games['Positive'] + games['Negative']) * 100
     
     # 3. Filter for games with a positive rating percentage > 90%
-    final_filtered_games = filtered_games[filtered_games['positive_rating_percentage'] > 90]
+    games = games[games['positive_rating_percentage'] > 90]
     
     # Count how many are left
-    remaining_count = len(final_filtered_games)
+    remaining_count = len(games)
 
 
     # Display the number of removed entries
