@@ -29,15 +29,19 @@ def data_processing():
     games['positive_rating_percentage'] = games['Positive'] / (games['Positive'] + games['Negative']) * 100
     
     # 3. Filter for games with a positive rating percentage > 90%
-    games = games[games['positive_rating_percentage'] > 75]
+    games = games[games['positive_rating_percentage'] > 85]
     
     # Count how many are left
     remaining_count = len(games)
+
+    games = games[games['Recommendations'] > 100]
+    after_recommendations_filter = len(games)
 
 
     # Display the number of removed entries
     st.write(f"Number of games removed due to 'Sexual Content': {removed_count}")
     st.write(f"Number of games with 90%+ review ratings: {remaining_count}")
+    st.write(f"Number of games with more tahn 100 recommendations: {after_recommendations_filter}")
     
     # Rename columns to match the original code
     games.rename(columns={
