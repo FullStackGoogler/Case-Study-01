@@ -2,46 +2,33 @@ import streamlit as st
 import pandas as pd
 import re
 from datetime import datetime
-#from FlagEmbedding import BGEM3FlagModel
-# Use a pipeline as a high-level helper
-#from transformers import pipeline
-#from transformers import AutoTokenizer, AutoModel
 import torch
 import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer, util
 
-
-############ Functions ############
-
-# st.cache_resoure is for: 
-
 @st.cache_data
 def data_processing():
-    # Load the new CSV file
-    games = pd.read_csv('./games.csv')
+    # CSV File
+    games = pd.read_csv('games.csv')
 
     # Filter out games with "Sexual Content" in the Tags column
     initial_count = len(games)
     games = games[~games['Tags'].str.contains('Sexual Content', na=False)]
     removed_count = initial_count - len(games)
 
-    # 2. Calculate the positive rating percentage
+    # Filter for games with a positive rating percentage > 90%
     games['positive_rating_percentage'] = games['Positive'] / (games['Positive'] + games['Negative']) * 100
-    
-    # 3. Filter for games with a positive rating percentage > 90%
     games = games[games['positive_rating_percentage'] > 85]
-    
-    # Count how many are left
     remaining_count = len(games)
 
-    games = games[games['Recommendations'] > 100]
+    # Games with more than 500 recommendations
+    games = games[games['Recommendations'] > 500]
     after_recommendations_filter = len(games)
 
-
-    # Display the number of removed entries
+    # Debugging: Display the count of removed entries
     st.write(f"Number of games removed due to 'Sexual Content': {removed_count}")
     st.write(f"Number of games with 90%+ review ratings: {remaining_count}")
-    st.write(f"Number of games with more tahn 100 recommendations: {after_recommendations_filter}")
+    st.write(f"Number of games with more recommend: {after_recommendations_filter}")
     
     # Rename columns to match the original code
     games.rename(columns={
@@ -79,8 +66,8 @@ def data_processing():
     games = games.dropna(subset=['year'])
     games = games[games['Release Date'].notnull()]
     
-    # Keep only games released in the last 3 years
-    five_years_before = datetime.now().year - 3
+    # Keep only games released in the last 4 years
+    five_years_before = datetime.now().year - 4
     games = games[games['year'] > five_years_before]
     
     return games
@@ -95,61 +82,69 @@ def calculate_similarities(name, data_original, data_filtered):
     games_filtered = data_original.query(f'year > {five_years_before}')
 
     result = data_filtered
-    
-    # Gather terms from Categories, Genres, and Tags and concatenate them into one string
-    selected_game_terms = ' '.join(
-        str(result.Categories.item()) + ' ' +
-        str(result.Genres.item()) + ' ' +
+
+    # Step 1: Gather terms from Categories, Genres, Tags, and sort them
+    selected_game_terms = ' '.join(sorted([
+        str(result.Categories.item()),
+        str(result.Genres.item()),
         str(result.Tags.item())
-    )
-    """
-    # Concatenate the terms for all games in the filtered set
+    ]))
+
+    # Step 2: Gather terms from Publisher/Developer
+    selected_game_team = ' '.join(sorted([
+        str(result['Team'].item())
+    ]))
+
+    # Step 3: Transform the summary of the selected game
+    summary_selected_game = re.sub(r'\s{2,}', '', str(result.Summary.item()).replace('\n', ' '), flags=re.MULTILINE)
+    
+    # Transform all summaries, tags, categories, and publishers/developers into lists of strings
+    summaries_all_games = games_filtered['Summary'].fillna('').str.replace(r'[\n\s]{2,}', ' ', regex=True).values.tolist()
     all_game_terms = games_filtered.apply(
-        lambda row: ' '.join([
+        lambda row: ' '.join(sorted([
             str(row['Categories']),
             str(row['Genres']),
             str(row['Tags'])
-        ]),
+        ])),
         axis=1
     ).tolist()
-    
-    # Ensure all terms are strings
+    all_game_teams = games_filtered['Team'].apply(lambda x: ' '.join(sorted(str(x)))).tolist()
+
+    # Ensure all elements are strings
+    summaries_all_games = [str(summary) for summary in summaries_all_games]
     all_game_terms = [str(terms) for terms in all_game_terms]
-    """
+    all_game_teams = [str(team) for team in all_game_teams]
 
-    # Take the summary of the selected game and transform it to a single string
-    summary_selected_game = re.sub(r'\s{2,}', '', str(result.Summary.item()).replace('\n', ' '), flags=re.MULTILINE)
-    
-    # Transform all summaries into a list of strings
-    summaries_all_games = games_filtered['Summary'].fillna('').str.replace(r'[\n\s]{2,}', ' ', regex=True).values.tolist()
-    
-    # Ensure all summaries are strings
-    all_game_terms = [str(summary) for summary in summaries_all_games]
-
-    
-    # Debugging step to find non-string values
-    for i, terms in enumerate(all_game_terms):
-        if not isinstance(terms, str):
-            print(f"Non-string value detected at index {i}: {terms} (type: {type(terms)})")
-    
     # Run the model
     model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
     
-    # Compute embeddings
-    embedding_1 = model.encode(selected_game_terms, convert_to_tensor=True)
-    embedding_2 = model.encode(all_game_terms, convert_to_tensor=True)
-    
+    # Compute embeddings for each part
+    embedding_summary = model.encode(summary_selected_game, convert_to_tensor=True)
+    embedding_terms = model.encode(selected_game_terms, convert_to_tensor=True)
+    embedding_team = model.encode(selected_game_team, convert_to_tensor=True)
+
+    # Compute embeddings for all games
+    embeddings_summaries = model.encode(summaries_all_games, convert_to_tensor=True)
+    embeddings_terms = model.encode(all_game_terms, convert_to_tensor=True)
+    embeddings_teams = model.encode(all_game_teams, convert_to_tensor=True)
+
     # Compute similarity
-    similarity = util.pytorch_cos_sim(embedding_1, embedding_2)
+    similarity_summaries = util.pytorch_cos_sim(embedding_summary, embeddings_summaries)
+    similarity_terms = util.pytorch_cos_sim(embedding_terms, embeddings_terms)
+    similarity_teams = util.pytorch_cos_sim(embedding_team, embeddings_teams)
+
+    # Combine similarity scores (optionally with weights)
+    final_similarity = (0.5 * similarity_summaries + 0.3 * similarity_terms + 0.2 * similarity_teams)
     
-    # Add similarity scores back to the DataFrame
-    games_filtered['similarity'] = similarity[0].tolist()
+    # Add final similarity scores back to the DataFrame
+    games_filtered['similarity'] = final_similarity[0].tolist()
     
     # Order the DataFrame based on the similarity scores
     top5 = games_filtered.sort_values(by='similarity', ascending=False)[:5]
     
     st.write(f'\n These are the 5 most similar games to {name}:')
     st.dataframe(top5[['Title', 'similarity']])
+
 
 
 
