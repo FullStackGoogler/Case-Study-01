@@ -102,7 +102,7 @@ def calculate_similarities(name, data_original, data_filtered):
         str(result.Genres.item()) + ' ' +
         str(result.Tags.item())
     )
-    
+    """
     # Concatenate the terms for all games in the filtered set
     all_game_terms = games_filtered.apply(
         lambda row: ' '.join([
@@ -115,6 +115,17 @@ def calculate_similarities(name, data_original, data_filtered):
     
     # Ensure all terms are strings
     all_game_terms = [str(terms) for terms in all_game_terms]
+    """
+
+    # Take the summary of the selected game and transform it to a single string
+    summary_selected_game = re.sub(r'\s{2,}', '', str(result.Summary.item()).replace('\n', ' '), flags=re.MULTILINE)
+    
+    # Transform all summaries into a list of strings
+    summaries_all_games = games_filtered['Summary'].fillna('').str.replace(r'[\n\s]{2,}', ' ', regex=True).values.tolist()
+    
+    # Ensure all summaries are strings
+    all_game_terms = [str(summary) for summary in summaries_all_games]
+
     
     # Debugging step to find non-string values
     for i, terms in enumerate(all_game_terms):
