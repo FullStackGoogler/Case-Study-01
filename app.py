@@ -83,7 +83,7 @@ def display_results(top5):
         
         # Display the game's image
         st.image(row['Header image'], caption=row['Title'])
-
+"""
         # Create a list of screenshots
         screenshots = row['Screenshots'].item().split(',')
         
@@ -108,7 +108,7 @@ def display_results(top5):
     
         else:
             st.write("No screenshots available for this game.")
-            
+"""         
         # Add a horizontal line for separation between results
         st.markdown("---")
 
