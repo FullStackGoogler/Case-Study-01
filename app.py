@@ -85,7 +85,7 @@ def display_results(top5):
         st.image(row['Header image'], caption=row['Title'])
 
         # Create a list of screenshots
-        screenshots = game_info['Screenshots'].item().split(',')
+        screenshots = row['Screenshots'].item().split(',')
         
         if screenshots:
             # Initialize session state for the image index
