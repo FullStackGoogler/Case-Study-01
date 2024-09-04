@@ -6,29 +6,30 @@ import torch
 import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer, util
 
+# Helper Functions
+
 @st.cache_data
 def data_processing():
-    # CSV File
     games = pd.read_csv('games.csv')
 
-    # Filter out games with "Sexual Content" in the Tags column
+    # Remove any games with the "Sexual Content" tag
     initial_count = len(games)
     games = games[~games['Tags'].str.contains('Sexual Content', na=False)]
     removed_count = initial_count - len(games)
 
-    # Filter for games with a positive rating percentage > 90%
+    # Keep games that have a rating of at least 85%
     games['positive_rating_percentage'] = games['Positive'] / (games['Positive'] + games['Negative']) * 100
     games = games[games['positive_rating_percentage'] > 85]
     remaining_count = len(games)
 
-    # Games with more than 500 recommendations
+    # Keep games with more than 500 recommendations
     games = games[games['Recommendations'] > 500]
-    after_recommendations_filter = len(games)
+    rec_count = len(games)
 
     # Debugging: Display the count of removed entries
-    st.write(f"Number of games removed due to 'Sexual Content': {removed_count}")
-    st.write(f"Number of games with 90%+ review ratings: {remaining_count}")
-    st.write(f"Number of games with more recommend: {after_recommendations_filter}")
+    print(f"Number of games removed due to 'Sexual Content': {removed_count}")
+    print(f"Number of games with a rating of at least 85%: {remaining_count}")
+    print(f"Number of games with at least 500 recommendations: {rec_count}")
     
     # Rename columns to match the original code
     games.rename(columns={
@@ -41,22 +42,20 @@ def data_processing():
         'About the game': 'Summary'
     }, inplace=True)
     
-    # Drop duplicate columns
-    games = games.loc[:, ~games.columns.duplicated()]
-    
-    # Drop any duplicate rows
-    games.drop_duplicates(inplace=True)
+    # Remove duplicates
+    games = games.loc[:, ~games.columns.duplicated()] # Cols
+    games.drop_duplicates(inplace=True) # Rows
     
     # Handle apostrophes in titles
     games['fixed_title'] = games['Title'].astype(str).str.replace(r"'", "", regex=True)
     
-    # Print column types and sample values for debugging
+    # Debugging types & sample values
     print("Columns and their types:")
     print(games.dtypes)
     print("\nSample values:")
     print(games.head())
     
-    # Convert release dates and handle null values
+    # Convert release dates
     games['Release Date'] = pd.to_datetime(games['Release Date'], errors='coerce')
     
     # Extract year from the 'Release Date'
@@ -66,40 +65,44 @@ def data_processing():
     games = games.dropna(subset=['year'])
     games = games[games['Release Date'].notnull()]
     
-    # Keep only games released in the last 4 years
-    five_years_before = datetime.now().year - 4
+    # Keep only games released in the last 5 years
+    five_years_before = datetime.now().year - 5
     games = games[games['year'] > five_years_before]
+    recent_count = len(games)
+
+    print(f"Number of games released within the last 5 years: {recent_count}")
     
     return games
 
 #@st.cache_resource
 def calculate_similarities(name, data_original, data_filtered):
-    # Drop the games that were selected
+    # Drop the game that were selected
     data_original.drop(data_original.query('Title == @name').index, inplace=True)
     
-    # Filter games from the last 3 years
-    five_years_before = datetime.now().year - 7
+    # Filter games from the last 5 years
+    five_years_before = datetime.now().year - 5
     games_filtered = data_original.query(f'year > {five_years_before}')
 
     result = data_filtered
 
-    # Step 1: Gather terms from Categories, Genres, Tags, and sort them
+    # Combine terms from Categories, Genres, and Tags columns
     selected_game_terms = ' '.join(sorted([
         str(result.Categories.item()),
         str(result.Genres.item()),
         str(result.Tags.item())
     ]))
 
-    # Step 2: Gather terms from Publisher/Developer
+    # Get Publisher/Developers
     selected_game_team = ' '.join(sorted([
         str(result['Team'].item())
     ]))
 
-    # Step 3: Transform the summary of the selected game
+    # Take the summary of the game and transform to string
     summary_selected_game = re.sub(r'\s{2,}', '', str(result.Summary.item()).replace('\n', ' '), flags=re.MULTILINE)
     
     # Transform all summaries, tags, categories, and publishers/developers into lists of strings
     summaries_all_games = games_filtered['Summary'].fillna('').str.replace(r'[\n\s]{2,}', ' ', regex=True).values.tolist()
+    
     all_game_terms = games_filtered.apply(
         lambda row: ' '.join(sorted([
             str(row['Categories']),
@@ -133,8 +136,8 @@ def calculate_similarities(name, data_original, data_filtered):
     similarity_terms = util.pytorch_cos_sim(embedding_terms, embeddings_terms)
     similarity_teams = util.pytorch_cos_sim(embedding_team, embeddings_teams)
 
-    # Combine similarity scores (optionally with weights)
-    final_similarity = (0.5 * similarity_summaries + 0.3 * similarity_terms + 0.2 * similarity_teams)
+    # Combine similarity scores
+    final_similarity = (0.25 * similarity_summaries + 0.5 * similarity_terms + 0.25 * similarity_teams) # TODO: Tinker around with these weights more?
     
     # Add final similarity scores back to the DataFrame
     games_filtered['similarity'] = final_similarity[0].tolist()
@@ -143,26 +146,20 @@ def calculate_similarities(name, data_original, data_filtered):
     top5 = games_filtered.sort_values(by='similarity', ascending=False)[:5]
     
     st.write(f'\n These are the 5 most similar games to {name}:')
-    st.dataframe(top5[['Title', 'similarity']])
+    st.dataframe(top5[['Title', 'similarity']]) # TODO: Add more description columnms to the result
 
-
-
-
-
-############ App ############
+# Application
 
 st.set_page_config(layout="wide")
 
 # Title! 
-st.title("🎮 Welcome to the Game Recommender!")
+st.title("GG Go Next!")
 
 # Sidebar
 with st.sidebar:
-    st.header("How to use it")
-    st.write("Select a game from the dropdown menu and wait! \n\n You'll receive the top 5 most similar games released in the last 3 years. \n\n Enjoy!")
-    st.sidebar.info("Want to know more about this recommender and how I built it? Access the [GitHub repo](https://github.com/ElisaRMA)",icon="ℹ️")
-
-
+    st.header("🎮")
+    st.write("Select a game from the dropdown menu, and the app will calculate the five games most similar to the selected game! *Note that it does take about a minute or so to crunch the results.*")
+    st.sidebar.info("This application was originally a project from Elisa Ribeiro, whose repo can be found here: [GitHub repo](https://github.com/ElisaRMA). I have since added my own improvements to the algorithm, updated the dataset used, and tweaked the UI.",icon="ℹ️")
 
 # keeping track of session_state so buttons can be used inside multiple conditionals
 def set_stage(stage):
@@ -187,7 +184,6 @@ find_me = st.button("Find a similar game!",on_click=set_stage, args=(1,))
 # if session state is larger then one, meaning, the user clicked on the "Find a similar game!" button
 # at this point, session_state.stage is equal to one
 if st.session_state.stage > 0:
-    
     # when a user clicks on the 'x' on the selectbox to clean selection, an attribute error was thrown because you can't replace a characters on a None object. 
     # So, we use try except to catch that error and instead of showing it, just display a pretty message for the user to reselect a game
     try:
@@ -197,12 +193,12 @@ if st.session_state.stage > 0:
         st.write('Reselect a game, please')
         set_stage(0)
 
-    print("\nDebugging Information:")
-    print(f"Type of fixed_title column: {games['fixed_title'].dtype}")
-    print(f"Type of option variable: {type(option)}")
-    print(f"Value of option variable: {option}")
-    print(f"Sample values from fixed_title column:")
-    print(games['fixed_title'].head())
+    #print("\nDebugging Information:")
+    #print(f"Type of fixed_title column: {games['fixed_title'].dtype}")
+    #print(f"Type of option variable: {type(option)}")
+    #print(f"Value of option variable: {option}")
+    #print(f"Sample values from fixed_title column:")
+    #print(games['fixed_title'].head())
 
     #filtered = games.query('fixed_title == @option')
     filtered = games.loc[games['fixed_title'] == option]
