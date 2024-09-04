@@ -74,6 +74,18 @@ def data_processing():
     
     return games
 
+def display_results(top5):
+    for index, row in top5.iterrows():
+        st.markdown(f"### **{row['Title']}** ({row['similarity']:.2f})")
+        st.markdown(f"**Developer and Publisher:** {row['Team']}")
+        st.markdown(f"**Summary:** {row['Summary']}")
+        
+        # Display the game's image
+        st.image(row['Header image'], caption=row['Title'])
+        
+        # Add a horizontal line for separation between results
+        st.markdown("---")
+
 #@st.cache_resource
 def calculate_similarities(name, data_original, data_filtered):
     # Drop the game that were selected
@@ -137,7 +149,7 @@ def calculate_similarities(name, data_original, data_filtered):
     similarity_teams = util.pytorch_cos_sim(embedding_team, embeddings_teams)
 
     # Combine similarity scores
-    final_similarity = (0.25 * similarity_summaries + 0.5 * similarity_terms + 0.25 * similarity_teams) # TODO: Tinker around with these weights more?
+    final_similarity = (0.4 * similarity_summaries + 0.35 * similarity_terms + 0.25 * similarity_teams) # TODO: Tinker around with these weights more?
     
     # Add final similarity scores back to the DataFrame
     games_filtered['similarity'] = final_similarity[0].tolist()
@@ -146,7 +158,7 @@ def calculate_similarities(name, data_original, data_filtered):
     top5 = games_filtered.sort_values(by='similarity', ascending=False)[:5]
     
     st.write(f'\n These are the 5 most similar games to {name}:')
-    st.dataframe(top5[['Title', 'similarity']]) # TODO: Add more description columnms to the result
+    display_results(top5)
 
 # Application
 
@@ -158,7 +170,7 @@ st.title("GG Go Next!")
 # Sidebar
 with st.sidebar:
     st.header("🎮")
-    st.write("Select a game from the dropdown menu, and the app will calculate the five games most similar to the selected game! *Note that it does take about a minute or so to crunch the results.*")
+    st.write("Select a game from the dropdown menu, and the app will calculate the five games most similar to the selected game! *Note that it does a few minutes to crunch the results.*")
     st.sidebar.info("This application was originally a project from Elisa Ribeiro, whose repo can be found here: [GitHub repo](https://github.com/ElisaRMA). I have since added my own improvements to the algorithm, updated the dataset used, and tweaked the UI.",icon="ℹ️")
 
 # keeping track of session_state so buttons can be used inside multiple conditionals
@@ -229,7 +241,7 @@ if st.session_state.stage > 0:
             # reset everything to initial step
             set_stage(0)
 
-
+    # TODO: Is this case needed if I just properly remove duplicates?
     # if there is two games with the same name in the dataset (e.g. cases like remakes), user will be asked to select which game (which year/team)
     elif len(filtered) > 1:
         indexes = filtered.index.tolist()
