@@ -1,7 +1,10 @@
-import streamlit as st
 import pandas as pd
-import re
 from datetime import datetime
+
+import re
+import streamlit as st
+import streamlit.components.v1 as components
+
 import torch
 import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer, util
@@ -37,8 +40,6 @@ def data_processing():
         'Release date': 'Release Date',
         'Publishers': 'Team',
         'Developers': 'Team',
-        #'Genres': 'Genres',
-        #'Tags': 'Genres',
         'About the game': 'Summary'
     }, inplace=True)
     
@@ -78,11 +79,36 @@ def display_results(top5):
     for index, row in top5.iterrows():
         st.markdown(f"### **{row['Title']}** ({row['similarity']:.2f})")
         st.markdown(f"**Developer and Publisher:** {row['Team']}")
-        st.markdown(f"**Summary:** {row['Summary']}")
+        st.markdown(f"{row['Summary']}")
         
         # Display the game's image
         st.image(row['Header image'], caption=row['Title'])
+
+        # Create a list of screenshots
+        screenshots = game_info['Screenshots'].item().split(',')
         
+        if screenshots:
+            # Initialize session state for the image index
+            if 'image_index' not in st.session_state:
+                st.session_state.image_index = 0
+            
+            # Centered circular buttons for navigation
+            col1, col2, col3 = st.columns([1, 2, 1])
+            
+            with col1:
+                if st.button("◀️", key="prev"):
+                    st.session_state.image_index = (st.session_state.image_index - 1) % len(screenshots)
+            
+            with col3:
+                if st.button("▶️", key="next"):
+                    st.session_state.image_index = (st.session_state.image_index + 1) % len(screenshots)
+            
+            # Display current screenshot
+            st.image(screenshots[st.session_state.image_index].strip(), use_column_width=True)
+    
+        else:
+            st.write("No screenshots available for this game.")
+            
         # Add a horizontal line for separation between results
         st.markdown("---")
 
