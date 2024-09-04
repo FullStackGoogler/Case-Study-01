@@ -66,11 +66,11 @@ def data_processing():
     games = games[games['Release Date'].notnull()]
     
     # Keep only games released in the last 5 years
-    five_years_before = datetime.now().year - 5
+    five_years_before = datetime.now().year - 4
     games = games[games['year'] > five_years_before]
     recent_count = len(games)
 
-    print(f"Number of games released within the last 5 years: {recent_count}")
+    print(f"Number of games released within the last 4 years: {recent_count}")
     
     return games
 
@@ -80,7 +80,7 @@ def calculate_similarities(name, data_original, data_filtered):
     data_original.drop(data_original.query('Title == @name').index, inplace=True)
     
     # Filter games from the last 5 years
-    five_years_before = datetime.now().year - 5
+    five_years_before = datetime.now().year - 4
     games_filtered = data_original.query(f'year > {five_years_before}')
 
     result = data_filtered
@@ -219,7 +219,7 @@ if st.session_state.stage > 0:
         # after clicking on yes/no the the session_state.stage will be larger than 1 (2 for button1 and 3 for button3.
     
         if st.session_state.stage > 1 and button1:
-            st.write(f'\n Now, we will calculate similarities between {option} and other games from the last 3 years. Please wait...\n\n\n')
+            st.write(f'\n Now, we will calculate similarities between {option} and other games from the last 4 years. Please wait...\n\n\n')
             calculate_similarities(option, games, filtered)
 
 
