@@ -18,6 +18,7 @@ def data_processing():
     # Remove any games with the "Sexual Content" tag
     initial_count = len(games)
     games = games[~games['Tags'].str.contains('Sexual Content', na=False)]
+    games = games[~games['Name'].str.contains('Sex', case=False, na=False)]
     removed_count = initial_count - len(games)
 
     # Debugging: Display the count of removed entries
