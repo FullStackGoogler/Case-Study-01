@@ -12,6 +12,8 @@ from sentence_transformers import SentenceTransformer, util
 from huggingface_hub import InferenceClient
 from transformers import AutoTokenizer, AutoModel
 
+import requests
+
 # Helper Functions
 
 @st.cache_data
@@ -79,6 +81,33 @@ def display_results(top5):
         
         # Add a horizontal line for separation between results
         st.markdown("---")
+
+def get_embedding_from_api(text, api_url, headers):
+    # Prepare the payload
+    data = {"inputs": text}
+    
+    # Send the request
+    response = requests.post(api_url, headers=headers, json=data)
+    
+    # Handle errors
+    if response.status_code != 200:
+        raise ValueError(f"Error: {response.status_code}, {response.text}")
+    
+    return response.json()  # This will return the embedding from the API
+
+def get_embedding(text):
+        # Tokenize the text
+        inputs = tokenizer(text, return_tensors='pt', padding=True, truncation=True)
+        
+        # Get model output (last hidden state)
+        with torch.no_grad():
+            outputs = model(**inputs)
+        
+        # Get the embeddings (pooler_output is often used, or mean of last hidden state)
+        # For sentence-transformers models, use mean of last hidden state
+        embeddings = outputs.last_hidden_state.mean(dim=1)
+        
+        return embeddings
 
 #@st.cache_resource
 def calculate_similarities(name, data_original, data_filtered, use_local_model):
@@ -169,21 +198,7 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
     else:
         # Run the model
         tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
-    model = AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
-    
-    def get_embedding(text):
-        # Tokenize the text
-        inputs = tokenizer(text, return_tensors='pt', padding=True, truncation=True)
-        
-        # Get model output (last hidden state)
-        with torch.no_grad():
-            outputs = model(**inputs)
-        
-        # Get the embeddings (pooler_output is often used, or mean of last hidden state)
-        # For sentence-transformers models, use mean of last hidden state
-        embeddings = outputs.last_hidden_state.mean(dim=1)
-        
-        return embeddings
+        model = AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
     
         # Compute embeddings for each part
         embedding_summary = get_embedding(summary_selected_game)
