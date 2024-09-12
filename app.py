@@ -187,7 +187,7 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         api_key = os.getenv("API_KEY")
         # API URL and headers
         api_url = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2"
-        headers = {"Authorization": f"Bearer api_key"}
+        headers = {"Authorization": f"Bearer {api_key}"}
         
         # Get embeddings for the selected game using the API
         embedding_summary = get_embedding_from_api(summary_selected_game, api_url, headers)
