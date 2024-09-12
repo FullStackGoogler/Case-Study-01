@@ -72,7 +72,7 @@ def display_results(top5):
         st.markdown(f"{row['Summary']}")
         
         # Display the game's image
-        st.image(row['Header image'], caption=row['Title'])
+        st.image(row['Header image'])
         
         # Add a horizontal line for separation between results
         st.markdown("---")
@@ -173,7 +173,7 @@ st.title("GG Go Next!")
 # Sidebar
 with st.sidebar:
     st.header("🎮")
-    st.write("Select a game from the dropdown menu, and the app will calculate the five games most similar to the selected game! *Note that it does a few minutes to crunch the results.*")
+    st.write("Select a game from the dropdown menu, and the app will calculate the five games most similar to the selected game that were released recently! *Note that it does a few seconds to crunch the results.*")
     st.sidebar.info("This application was originally a project from Elisa Ribeiro, whose repo can be found here: [GitHub repo](https://github.com/ElisaRMA). I have since added my own improvements to the algorithm, updated the dataset used, and tweaked the UI.",icon="ℹ️")
 
 # keeping track of session_state so buttons can be used inside multiple conditionals
