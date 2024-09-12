@@ -83,7 +83,7 @@ def display_results(top5):
         
         # Display the game's image
         st.image(row['Header image'], caption=row['Title'])
-"""
+
         # Create a list of screenshots
         screenshots = row['Screenshots'].item().split(',')
         
@@ -108,7 +108,7 @@ def display_results(top5):
     
         else:
             st.write("No screenshots available for this game.")
-"""         
+        
         # Add a horizontal line for separation between results
         st.markdown("---")
 
@@ -175,7 +175,7 @@ def calculate_similarities(name, data_original, data_filtered):
     similarity_teams = util.pytorch_cos_sim(embedding_team, embeddings_teams)
 
     # Combine similarity scores
-    final_similarity = (0.4 * similarity_summaries + 0.35 * similarity_terms + 0.25 * similarity_teams) # TODO: Tinker around with these weights more?
+    final_similarity = (0.4 * similarity_summaries + 0.45 * similarity_terms + 0.15 * similarity_teams) # TODO: Tinker around with these weights more?
     
     # Add final similarity scores back to the DataFrame
     games_filtered['similarity'] = final_similarity[0].tolist()
