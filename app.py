@@ -83,31 +83,6 @@ def display_results(top5):
         
         # Display the game's image
         st.image(row['Header image'], caption=row['Title'])
-
-        # Create a list of screenshots
-        screenshots = row['Screenshots'].item().split(',')
-        
-        if screenshots:
-            # Initialize session state for the image index
-            if 'image_index' not in st.session_state:
-                st.session_state.image_index = 0
-            
-            # Centered circular buttons for navigation
-            col1, col2, col3 = st.columns([1, 2, 1])
-            
-            with col1:
-                if st.button("◀️", key="prev"):
-                    st.session_state.image_index = (st.session_state.image_index - 1) % len(screenshots)
-            
-            with col3:
-                if st.button("▶️", key="next"):
-                    st.session_state.image_index = (st.session_state.image_index + 1) % len(screenshots)
-            
-            # Display current screenshot
-            st.image(screenshots[st.session_state.image_index].strip(), use_column_width=True)
-    
-        else:
-            st.write("No screenshots available for this game.")
         
         # Add a horizontal line for separation between results
         st.markdown("---")
@@ -118,7 +93,7 @@ def calculate_similarities(name, data_original, data_filtered):
     data_original.drop(data_original.query('Title == @name').index, inplace=True)
     
     # Filter games from the last 5 years
-    five_years_before = datetime.now().year - 4
+    five_years_before = datetime.now().year - 2
     games_filtered = data_original.query(f'year > {five_years_before}')
 
     result = data_filtered
