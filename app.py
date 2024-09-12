@@ -14,6 +14,8 @@ from transformers import AutoTokenizer, AutoModel
 
 import requests
 
+import os
+
 # Helper Functions
 
 @st.cache_data
@@ -94,20 +96,6 @@ def get_embedding_from_api(text, api_url, headers):
         raise ValueError(f"Error: {response.status_code}, {response.text}")
     
     return response.json()  # This will return the embedding from the API
-
-def get_embedding(text):
-        # Tokenize the text
-        inputs = tokenizer(text, return_tensors='pt', padding=True, truncation=True)
-        
-        # Get model output (last hidden state)
-        with torch.no_grad():
-            outputs = model(**inputs)
-        
-        # Get the embeddings (pooler_output is often used, or mean of last hidden state)
-        # For sentence-transformers models, use mean of last hidden state
-        embeddings = outputs.last_hidden_state.mean(dim=1)
-        
-        return embeddings
 
 #@st.cache_resource
 def calculate_similarities(name, data_original, data_filtered, use_local_model):
@@ -196,24 +184,25 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         st.write(f'\n These are the 5 most similar games to {name}:')
         display_results(top5)
     else:
-        # Run the model
-        tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
-        model = AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
-    
-        # Compute embeddings for each part
-        embedding_summary = get_embedding(summary_selected_game)
-        embedding_terms = get_embedding(selected_game_terms)
-        embedding_team = get_embedding(selected_game_team)
+        api_key = os.getenv("API_KEY")
+        # API URL and headers
+        api_url = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2"
+        headers = {"Authorization": f"Bearer api_key"}
         
-        # Compute embeddings for all games
-        embeddings_summaries = get_embedding(summaries_all_games)
-        embeddings_terms = get_embedding(all_game_terms)
-        embeddings_teams = get_embedding(all_game_teams)
+        # Get embeddings for the selected game using the API
+        embedding_summary = get_embedding_from_api(summary_selected_game, api_url, headers)
+        embedding_terms = get_embedding_from_api(selected_game_terms, api_url, headers)
+        embedding_team = get_embedding_from_api(selected_game_team, api_url, headers)
         
-        # Compute similarity (cosine similarity)
-        similarity_summaries = F.cosine_similarity(embedding_summary, embeddings_summaries)
-        similarity_terms = F.cosine_similarity(embedding_terms, embeddings_terms)
-        similarity_teams = F.cosine_similarity(embedding_team, embeddings_teams)
+        # Get embeddings for all games using the API
+        embeddings_summaries = [get_embedding_from_api(summary, api_url, headers) for summary in summaries_all_games]
+        embeddings_terms = [get_embedding_from_api(terms, api_url, headers) for terms in all_game_terms]
+        embeddings_teams = [get_embedding_from_api(team, api_url, headers) for team in all_game_teams]
+        
+        # Compute similarity
+        similarity_summaries = F.cosine_similarity(torch.tensor(embedding_summary), torch.tensor(embeddings_summaries))
+        similarity_terms = F.cosine_similarity(torch.tensor(embedding_terms), torch.tensor(embeddings_terms))
+        similarity_teams = F.cosine_similarity(torch.tensor(embedding_team), torch.tensor(embeddings_teams))
         
         # Combine similarity scores
         final_similarity = (0.4 * similarity_summaries + 0.45 * similarity_terms + 0.15 * similarity_teams)
