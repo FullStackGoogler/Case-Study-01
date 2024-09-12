@@ -16,6 +16,15 @@ import requests
 
 import os
 
+api_key = os.getenv("API_KEY")
+# API URL and headers
+client = InferenceClient(api_key=api_key)
+model_name = 'all-MiniLM-L6-v2'
+
+def get_embeddings(text):
+    response = client.model(model_name=model_name, inputs=text)
+    return response['embeddings']
+
 # Helper Functions
 
 @st.cache_data
@@ -189,25 +198,30 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         st.write(f'\n These are the 5 most similar games to {name}:')
         display_results(top5)
     else:
-        api_key = os.getenv("API_KEY")
-        # API URL and headers
-        client = InferenceClient(api_key=api_key)
-        model_name = 'all-MiniLM-L6-v2'
-        
         # Get embeddings for the selected game using the API
-        embedding_summary = client(model_name=model_name, inputs=summary_selected_game)['embeddings']
-        embedding_terms = client(model_name=model_name, inputs=selected_game_terms)['embeddings']
-        embedding_team = client(model_name=model_name, inputs=selected_game_team)['embeddings']
+        embedding_summary = get_embeddings(summary_selected_game)
+        embedding_terms = get_embeddings(selected_game_terms)
+        embedding_team = get_embeddings(selected_game_team)
         
         # Get embeddings for all games using the API
-        embeddings_summaries = [client(model_name=model_name, inputs=summary_selected_game)['embeddings'] for summary in summaries_all_games]
-        embeddings_terms = [client(model_name=model_name, inputs=selected_game_terms)['embeddings'] for terms in all_game_terms]
-        embeddings_teams = [client(model_name=model_name, inputs=selected_game_team)['embeddings'] for team in all_game_teams]
+        embeddings_summaries = [get_embeddings(summary) for summary in summaries_all_games]
+        embeddings_terms = [get_embeddings(terms) for terms in all_game_terms]
+        embeddings_teams = [get_embeddings(team) for team in all_game_teams]
         
         # Compute similarity
-        similarity_summaries = F.cosine_similarity(torch.tensor(embedding_summary), torch.tensor(embeddings_summaries))
-        similarity_terms = F.cosine_similarity(torch.tensor(embedding_terms), torch.tensor(embeddings_terms))
-        similarity_teams = F.cosine_similarity(torch.tensor(embedding_team), torch.tensor(embeddings_teams))
+        # Convert lists of embeddings to tensors
+        tensor_embedding_summary = torch.tensor(embedding_summary)
+        tensor_embedding_terms = torch.tensor(embedding_terms)
+        tensor_embedding_team = torch.tensor(embedding_team)
+        
+        tensor_embeddings_summaries = torch.stack([torch.tensor(e) for e in embeddings_summaries])
+        tensor_embeddings_terms = torch.stack([torch.tensor(e) for e in embeddings_terms])
+        tensor_embeddings_teams = torch.stack([torch.tensor(e) for e in embeddings_teams])
+        
+        # Calculate cosine similarity
+        similarity_summaries = F.cosine_similarity(tensor_embedding_summary.unsqueeze(0), tensor_embeddings_summaries)
+        similarity_terms = F.cosine_similarity(tensor_embedding_terms.unsqueeze(0), tensor_embeddings_terms)
+        similarity_teams = F.cosine_similarity(tensor_embedding_team.unsqueeze(0), tensor_embeddings_teams)
         
         # Combine similarity scores
         final_similarity = (0.4 * similarity_summaries + 0.45 * similarity_terms + 0.15 * similarity_teams)
