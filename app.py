@@ -169,28 +169,42 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
     else:
         # Run the model
         tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
-        model = AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
+    model = AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
+    
+    def get_embedding(text):
+        # Tokenize the text
+        inputs = tokenizer(text, return_tensors='pt', padding=True, truncation=True)
         
+        # Get model output (last hidden state)
+        with torch.no_grad():
+            outputs = model(**inputs)
+        
+        # Get the embeddings (pooler_output is often used, or mean of last hidden state)
+        # For sentence-transformers models, use mean of last hidden state
+        embeddings = outputs.last_hidden_state.mean(dim=1)
+        
+        return embeddings
+    
         # Compute embeddings for each part
-        embedding_summary = model.encode(summary_selected_game, convert_to_tensor=True)
-        embedding_terms = model.encode(selected_game_terms, convert_to_tensor=True)
-        embedding_team = model.encode(selected_game_team, convert_to_tensor=True)
-    
+        embedding_summary = get_embedding(summary_selected_game)
+        embedding_terms = get_embedding(selected_game_terms)
+        embedding_team = get_embedding(selected_game_team)
+        
         # Compute embeddings for all games
-        embeddings_summaries = model.encode(summaries_all_games, convert_to_tensor=True)
-        embeddings_terms = model.encode(all_game_terms, convert_to_tensor=True)
-        embeddings_teams = model.encode(all_game_teams, convert_to_tensor=True)
-    
-        # Compute similarity
-        similarity_summaries = util.pytorch_cos_sim(embedding_summary, embeddings_summaries)
-        similarity_terms = util.pytorch_cos_sim(embedding_terms, embeddings_terms)
-        similarity_teams = util.pytorch_cos_sim(embedding_team, embeddings_teams)
-    
+        embeddings_summaries = get_embedding(summaries_all_games)
+        embeddings_terms = get_embedding(all_game_terms)
+        embeddings_teams = get_embedding(all_game_teams)
+        
+        # Compute similarity (cosine similarity)
+        similarity_summaries = F.cosine_similarity(embedding_summary, embeddings_summaries)
+        similarity_terms = F.cosine_similarity(embedding_terms, embeddings_terms)
+        similarity_teams = F.cosine_similarity(embedding_team, embeddings_teams)
+        
         # Combine similarity scores
-        final_similarity = (0.4 * similarity_summaries + 0.45 * similarity_terms + 0.15 * similarity_teams) # TODO: Tinker around with these weights more?
+        final_similarity = (0.4 * similarity_summaries + 0.45 * similarity_terms + 0.15 * similarity_teams)
         
         # Add final similarity scores back to the DataFrame
-        games_filtered['similarity'] = final_similarity[0].tolist()
+        games_filtered['similarity'] = final_similarity.tolist()
         
         # Order the DataFrame based on the similarity scores
         top5 = games_filtered.sort_values(by='similarity', ascending=False)[:5]
