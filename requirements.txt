@@ -6,3 +6,5 @@ numpy
 scikit-learn
 sentence-transformers
 huggingface_hub
+os
+requests
