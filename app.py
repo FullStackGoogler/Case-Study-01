@@ -86,7 +86,7 @@ def display_results(top5):
 
 def get_embedding_from_api(text, api_url, headers):
     # Prepare the payload
-    payload = {"inputs": text}
+    payload = {"inputs": {"text": text}}
     
     # Send the request
     response = requests.post(api_url, headers=headers, json=payload)
