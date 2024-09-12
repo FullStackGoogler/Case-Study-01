@@ -9,6 +9,8 @@ import torch
 import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer, util
 
+from huggingface_hub import InferenceClient
+
 # Helper Functions
 
 @st.cache_data
@@ -78,7 +80,7 @@ def display_results(top5):
         st.markdown("---")
 
 #@st.cache_resource
-def calculate_similarities(name, data_original, data_filtered):
+def calculate_similarities(name, data_original, data_filtered, use_local_model):
     # Drop the game that were selected
     data_original.drop(data_original.query('Title == @name').index, inplace=True)
 
@@ -133,35 +135,66 @@ def calculate_similarities(name, data_original, data_filtered):
     all_game_terms = [str(terms) for terms in all_game_terms]
     all_game_teams = [str(team) for team in all_game_teams]
 
-    # Run the model
-    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+    if use_local_model:
+        # Run the model
+        model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+        
+        # Compute embeddings for each part
+        embedding_summary = model.encode(summary_selected_game, convert_to_tensor=True)
+        embedding_terms = model.encode(selected_game_terms, convert_to_tensor=True)
+        embedding_team = model.encode(selected_game_team, convert_to_tensor=True)
     
-    # Compute embeddings for each part
-    embedding_summary = model.encode(summary_selected_game, convert_to_tensor=True)
-    embedding_terms = model.encode(selected_game_terms, convert_to_tensor=True)
-    embedding_team = model.encode(selected_game_team, convert_to_tensor=True)
-
-    # Compute embeddings for all games
-    embeddings_summaries = model.encode(summaries_all_games, convert_to_tensor=True)
-    embeddings_terms = model.encode(all_game_terms, convert_to_tensor=True)
-    embeddings_teams = model.encode(all_game_teams, convert_to_tensor=True)
-
-    # Compute similarity
-    similarity_summaries = util.pytorch_cos_sim(embedding_summary, embeddings_summaries)
-    similarity_terms = util.pytorch_cos_sim(embedding_terms, embeddings_terms)
-    similarity_teams = util.pytorch_cos_sim(embedding_team, embeddings_teams)
-
-    # Combine similarity scores
-    final_similarity = (0.4 * similarity_summaries + 0.45 * similarity_terms + 0.15 * similarity_teams) # TODO: Tinker around with these weights more?
+        # Compute embeddings for all games
+        embeddings_summaries = model.encode(summaries_all_games, convert_to_tensor=True)
+        embeddings_terms = model.encode(all_game_terms, convert_to_tensor=True)
+        embeddings_teams = model.encode(all_game_teams, convert_to_tensor=True)
     
-    # Add final similarity scores back to the DataFrame
-    games_filtered['similarity'] = final_similarity[0].tolist()
+        # Compute similarity
+        similarity_summaries = util.pytorch_cos_sim(embedding_summary, embeddings_summaries)
+        similarity_terms = util.pytorch_cos_sim(embedding_terms, embeddings_terms)
+        similarity_teams = util.pytorch_cos_sim(embedding_team, embeddings_teams)
     
-    # Order the DataFrame based on the similarity scores
-    top5 = games_filtered.sort_values(by='similarity', ascending=False)[:5]
+        # Combine similarity scores
+        final_similarity = (0.4 * similarity_summaries + 0.45 * similarity_terms + 0.15 * similarity_teams) # TODO: Tinker around with these weights more?
+        
+        # Add final similarity scores back to the DataFrame
+        games_filtered['similarity'] = final_similarity[0].tolist()
+        
+        # Order the DataFrame based on the similarity scores
+        top5 = games_filtered.sort_values(by='similarity', ascending=False)[:5]
+        
+        st.write(f'\n These are the 5 most similar games to {name}:')
+        display_results(top5)
+    else:
+        # Run the model
+        model = InferenceClient('sentence-transformers/all-MiniLM-L6-v2')
+        
+        # Compute embeddings for each part
+        embedding_summary = model.encode(summary_selected_game, convert_to_tensor=True)
+        embedding_terms = model.encode(selected_game_terms, convert_to_tensor=True)
+        embedding_team = model.encode(selected_game_team, convert_to_tensor=True)
     
-    st.write(f'\n These are the 5 most similar games to {name}:')
-    display_results(top5)
+        # Compute embeddings for all games
+        embeddings_summaries = model.encode(summaries_all_games, convert_to_tensor=True)
+        embeddings_terms = model.encode(all_game_terms, convert_to_tensor=True)
+        embeddings_teams = model.encode(all_game_teams, convert_to_tensor=True)
+    
+        # Compute similarity
+        similarity_summaries = util.pytorch_cos_sim(embedding_summary, embeddings_summaries)
+        similarity_terms = util.pytorch_cos_sim(embedding_terms, embeddings_terms)
+        similarity_teams = util.pytorch_cos_sim(embedding_team, embeddings_teams)
+    
+        # Combine similarity scores
+        final_similarity = (0.4 * similarity_summaries + 0.45 * similarity_terms + 0.15 * similarity_teams) # TODO: Tinker around with these weights more?
+        
+        # Add final similarity scores back to the DataFrame
+        games_filtered['similarity'] = final_similarity[0].tolist()
+        
+        # Order the DataFrame based on the similarity scores
+        top5 = games_filtered.sort_values(by='similarity', ascending=False)[:5]
+        
+        st.write(f'\n These are the 5 most similar games to {name}:')
+        display_results(top5)
 
 # Application
 
@@ -176,6 +209,8 @@ with st.sidebar:
     st.write("Select a game from the dropdown menu, and the app will calculate the five games most similar to the selected game that were released recently! *Note that it does a few seconds to crunch the results.*")
     st.sidebar.info("This application was originally a project from Elisa Ribeiro, whose repo can be found here: [GitHub repo](https://github.com/ElisaRMA). I have since added my own improvements to the algorithm, updated the dataset used, and tweaked the UI.",icon="ℹ️")
 
+    use_local_model = st.checkbox("Use Local Model", value=False)
+
 # keeping track of session_state so buttons can be used inside multiple conditionals
 def set_stage(stage):
     st.session_state.stage = stage
@@ -183,18 +218,14 @@ def set_stage(stage):
 if 'stage' not in st.session_state:
     st.session_state.stage = 0
 
-# loads data (and caches, because the function is being cached)
 games = data_processing()
 
-# selection box for user to choose a game
+# Selection Box
 option = st.selectbox(
     'Select a game',
     games.Title.sort_values().unique(), placeholder="Choose your game", index=None)
 
-
-# button to 'start' the app functions
-# after clicking it, sets stage to 1: is running set_stage function with argument 1
-find_me = st.button("Find a similar game!",on_click=set_stage, args=(1,))
+find_me = st.button("Find a similar game!",on_click=set_stage, args=(1,)) # Set stage to 1
 
 # if session state is larger then one, meaning, the user clicked on the "Find a similar game!" button
 # at this point, session_state.stage is equal to one
@@ -202,23 +233,15 @@ if st.session_state.stage > 0:
     # when a user clicks on the 'x' on the selectbox to clean selection, an attribute error was thrown because you can't replace a characters on a None object. 
     # So, we use try except to catch that error and instead of showing it, just display a pretty message for the user to reselect a game
     try:
-        # takes the aposthrofe out 
+        # takes the aposthrophe out 
         option = option.replace(r"'", "")
     except AttributeError:
         st.write('Reselect a game, please')
         set_stage(0)
 
-    #print("\nDebugging Information:")
-    #print(f"Type of fixed_title column: {games['fixed_title'].dtype}")
-    #print(f"Type of option variable: {type(option)}")
-    #print(f"Value of option variable: {option}")
-    #print(f"Sample values from fixed_title column:")
-    #print(games['fixed_title'].head())
-
-    #filtered = games.query('fixed_title == @option')
     filtered = games.loc[games['fixed_title'] == option]
     
-    # some testing on the filtered data so the user can confirm the game
+    # some testing on the filtered data so the user can confirm the game # TODO: Likely not needed
     if len(filtered) == 1:
         st.write('Is this the game you selected?')
         st.write(filtered.Title.item() + ' - ' + filtered.Team.item())
@@ -234,8 +257,8 @@ if st.session_state.stage > 0:
         # after clicking on yes/no the the session_state.stage will be larger than 1 (2 for button1 and 3 for button3.
     
         if st.session_state.stage > 1 and button1:
-            st.write(f'\n Now, we will calculate similarities between {option} and other games from the last 2 years. Please wait...\n\n\n')
-            calculate_similarities(option, games, filtered)
+            st.write(f'\n Calculating similarities between {option} and other games released in the past 2 years...\n\n\n')
+            calculate_similarities(option, games, filtered, use_local_model)
 
 
         elif st.session_state.stage > 1 and button2:
@@ -263,4 +286,4 @@ if st.session_state.stage > 0:
             st.dataframe(filtered_fixed[['Title', 'Release Date', 'Team']])
         
             st.write(f'\n Now, we will calculate similarities between {option} and other games from the last 3 years. Please wait...\n\n\n')
-            calculate_similarities(option, games, filtered_fixed)
+            calculate_similarities(option, games, filtered_fixed, use_local_model)
