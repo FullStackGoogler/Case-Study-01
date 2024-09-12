@@ -20,19 +20,10 @@ def data_processing():
     games = games[~games['Tags'].str.contains('Sexual Content', na=False)]
     removed_count = initial_count - len(games)
 
-    # Keep games that have a rating of at least 85%
-    games['positive_rating_percentage'] = games['Positive'] / (games['Positive'] + games['Negative']) * 100
-    games = games[games['positive_rating_percentage'] > 85]
-    remaining_count = len(games)
-
-    # Keep games with more than 500 recommendations
-    games = games[games['Recommendations'] > 500]
-    rec_count = len(games)
-
     # Debugging: Display the count of removed entries
-    print(f"Number of games removed due to 'Sexual Content': {removed_count}")
-    print(f"Number of games with a rating of at least 85%: {remaining_count}")
-    print(f"Number of games with at least 500 recommendations: {rec_count}")
+    #print(f"Number of games removed due to 'Sexual Content': {removed_count}")
+    #print(f"Number of games with a rating of at least 85%: {remaining_count}")
+    #print(f"Number of games with at least 500 recommendations: {rec_count}")
     
     # Rename columns to match the original code
     games.rename(columns={
@@ -91,6 +82,15 @@ def display_results(top5):
 def calculate_similarities(name, data_original, data_filtered):
     # Drop the game that were selected
     data_original.drop(data_original.query('Title == @name').index, inplace=True)
+
+    # Keep games that have a rating of at least 85%
+    data_original['positive_rating_percentage'] = data_original['Positive'] / (data_original['Positive'] + data_original['Negative']) * 100
+    data_original = data_original[data_original['positive_rating_percentage'] > 85]
+    #remaining_count = len(games)
+
+    # Keep games with more than 500 recommendations
+    data_original = data_original[data_original['Recommendations'] > 500]
+    #rec_count = len(games)
     
     # Filter games from the last 5 years
     five_years_before = datetime.now().year - 2
