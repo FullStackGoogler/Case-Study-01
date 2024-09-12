@@ -191,18 +191,18 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
     else:
         api_key = os.getenv("API_KEY")
         # API URL and headers
-        api_url = "https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2"
-        headers = {"Authorization": f"Bearer {api_key}"}
+        client = InferenceClient(api_key=api_key)
+        model_name = 'all-MiniLM-L6-v2'
         
         # Get embeddings for the selected game using the API
-        embedding_summary = get_embedding_from_api(summary_selected_game, api_url, headers)
-        embedding_terms = get_embedding_from_api(selected_game_terms, api_url, headers)
-        embedding_team = get_embedding_from_api(selected_game_team, api_url, headers)
+        embedding_summary = client(model_name=model_name, inputs=summary_selected_game)['embeddings']
+        embedding_terms = client(model_name=model_name, inputs=selected_game_terms)['embeddings']
+        embedding_team = client(model_name=model_name, inputs=selected_game_team)['embeddings']
         
         # Get embeddings for all games using the API
-        embeddings_summaries = [get_embedding_from_api(summary, api_url, headers) for summary in summaries_all_games]
-        embeddings_terms = [get_embedding_from_api(terms, api_url, headers) for terms in all_game_terms]
-        embeddings_teams = [get_embedding_from_api(team, api_url, headers) for team in all_game_teams]
+        embeddings_summaries = [client(model_name=model_name, inputs=summary_selected_game)['embeddings'] for summary in summaries_all_games]
+        embeddings_terms = [client(model_name=model_name, inputs=selected_game_terms)['embeddings'] for terms in all_game_terms]
+        embeddings_teams = [client(model_name=model_name, inputs=selected_game_team)['embeddings'] for team in all_game_teams]
         
         # Compute similarity
         similarity_summaries = F.cosine_similarity(torch.tensor(embedding_summary), torch.tensor(embeddings_summaries))
