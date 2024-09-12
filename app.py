@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer, util
 
 from huggingface_hub import InferenceClient
+from transformers import AutoTokenizer, AutoModel
 
 # Helper Functions
 
@@ -167,7 +168,8 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         display_results(top5)
     else:
         # Run the model
-        model = InferenceClient('sentence-transformers/all-MiniLM-L6-v2')
+        tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
+        model = AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
         
         # Compute embeddings for each part
         embedding_summary = model.encode(summary_selected_game, convert_to_tensor=True)
