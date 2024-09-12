@@ -198,33 +198,33 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         st.write(f'\n These are the 5 most similar games to {name}:')
         display_results(top5)
     else:
-        # Get embeddings for the selected game using the API
-        embedding_summary = get_embeddings(summary_selected_game)
-        embedding_terms = get_embeddings(selected_game_terms)
-        embedding_team = get_embeddings(selected_game_team)
+        client = InferenceClient()
         
-        # Get embeddings for all games using the API
-        embeddings_summaries = [get_embeddings(summary) for summary in summaries_all_games]
-        embeddings_terms = [get_embeddings(terms) for terms in all_game_terms]
-        embeddings_teams = [get_embeddings(team) for team in all_game_teams]
+        # Get similarities for summaries
+        summary_similarities = client.sentence_similarity(
+            summary_selected_game,
+            other_sentences=summaries_all_games,
+            model='sentence-transformers/all-MiniLM-L6-v2'
+        )
         
-        # Compute similarity
-        # Convert lists of embeddings to tensors
-        tensor_embedding_summary = torch.tensor(embedding_summary)
-        tensor_embedding_terms = torch.tensor(embedding_terms)
-        tensor_embedding_team = torch.tensor(embedding_team)
+        # Get similarities for terms
+        terms_similarities = client.sentence_similarity(
+            selected_game_terms,
+            other_sentences=all_game_terms,
+            model='sentence-transformers/all-MiniLM-L6-v2'
+        )
         
-        tensor_embeddings_summaries = torch.stack([torch.tensor(e) for e in embeddings_summaries])
-        tensor_embeddings_terms = torch.stack([torch.tensor(e) for e in embeddings_terms])
-        tensor_embeddings_teams = torch.stack([torch.tensor(e) for e in embeddings_teams])
-        
-        # Calculate cosine similarity
-        similarity_summaries = F.cosine_similarity(tensor_embedding_summary.unsqueeze(0), tensor_embeddings_summaries)
-        similarity_terms = F.cosine_similarity(tensor_embedding_terms.unsqueeze(0), tensor_embeddings_terms)
-        similarity_teams = F.cosine_similarity(tensor_embedding_team.unsqueeze(0), tensor_embeddings_teams)
+        # Get similarities for teams
+        team_similarities = client.sentence_similarity(
+            selected_game_team,
+            other_sentences=all_game_teams,
+            model='sentence-transformers/all-MiniLM-L6-v2'
+        )
         
         # Combine similarity scores
-        final_similarity = (0.4 * similarity_summaries + 0.45 * similarity_terms + 0.15 * similarity_teams)
+        final_similarity = (0.4 * np.array(summary_similarities) +
+                            0.45 * np.array(terms_similarities) +
+                            0.15 * np.array(team_similarities))
         
         # Add final similarity scores back to the DataFrame
         games_filtered['similarity'] = final_similarity.tolist()
