@@ -86,14 +86,19 @@ def display_results(top5):
 
 def get_embedding_from_api(text, api_url, headers):
     # Prepare the payload
-    data = {"inputs": text}
+    payload = {"inputs": text}
     
     # Send the request
-    response = requests.post(api_url, headers=headers, json=data)
+    response = requests.post(api_url, headers=headers, json=payload)
+    
+    # Debugging: Print payload and response
+    print(f"Payload: {payload}")
+    print(f"Response Status Code: {response.status_code}")
+    print(f"Response Text: {response.text}")
     
     # Handle errors
     if response.status_code != 200:
-        raise ValueError(f"Error: {response.status_code}, {response.text}")
+        raise ValueError(f"API request failed: {response.status_code} - {response.text}")
     
     return response.json()  # This will return the embedding from the API
 
