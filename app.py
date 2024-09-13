@@ -107,12 +107,12 @@ def find_best_weights(title_similiarities, summary_similarities, terms_similarit
             # Check if this combination produces a higher average similarity
             if avg_similarity > best_avg_similarity:
                 best_avg_similarity = avg_similarity
-                best_avg_weights = (summary_weight, terms_weight, team_weight)
+                best_avg_weights = (title_weight, summary_weight, terms_weight, team_weight)
             
             # Check if this combination produces a higher max similarity
             if max_similarity > best_max_similarity:
                 best_max_similarity = max_similarity
-                best_max_weights = (summary_weight, terms_weight, team_weight)
+                best_max_weights = (title_weight, summary_weight, terms_weight, team_weight)
     
     return best_avg_weights, best_max_weights, best_avg_similarity, best_max_similarity
 
