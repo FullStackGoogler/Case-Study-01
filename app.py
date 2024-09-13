@@ -82,9 +82,9 @@ def display_results(top5):
         # Add a horizontal line for separation between results
         st.markdown("---")
 
-def find_best_weights(summary_similarities, terms_similarities, team_similarities, games_filtered):
+def find_best_weights(title_similiarities, summary_similarities, terms_similarities, team_similarities, games_filtered):
     # Define possible values for weights
-    weights_range = np.arange(0, 1.1, 0.1)  # Example: [0, 0.1, 0.2, ..., 1.0]
+    weights_range = np.arange(0, 1.1, 0.1)  # [0, 0.1, 0.2, ..., 1.0]
     
     best_avg_similarity = 0
     best_max_similarity = 0
@@ -92,10 +92,11 @@ def find_best_weights(summary_similarities, terms_similarities, team_similaritie
     best_max_weights = None
     
     # Generate all combinations of weights that sum to 1
-    for summary_weight, terms_weight, team_weight in product(weights_range, repeat=3):
-        if np.isclose(summary_weight + terms_weight + team_weight, 1.0):
+    for title_weight, summary_weight, terms_weight, team_weight in product(weights_range, repeat=3):
+        if np.isclose(title_weight + summary_weight + terms_weight + team_weight, 1.0):
             # Compute final similarity score for the current weight combination
-            final_similarity = (summary_weight * np.array(summary_similarities) +
+            final_similarity = (title_weight * np.array(title_similiarities) +
+                                summary_weight * np.array(summary_similarities) +
                                 terms_weight * np.array(terms_similarities) +
                                 team_weight * np.array(team_similarities))
             
@@ -138,6 +139,9 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
 
     result = data_filtered
 
+    # Get game title
+    selected_game_title = str(result.Name.item())
+
     # Combine terms from Categories, Genres, and Tags columns
     selected_game_terms = ' '.join(sorted([
         str(result.Categories.item()),
@@ -155,6 +159,8 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
     
     # Transform all summaries, tags, categories, and publishers/developers into lists of strings
     summaries_all_games = games_filtered['Summary'].fillna('').str.replace(r'[\n\s]{2,}', ' ', regex=True).values.tolist()
+
+    all_game_titles = games_filtered['Title'].apply(lambda x: ' '.join(sorted(str(x)))).tolist()
     
     all_game_terms = games_filtered.apply(
         lambda row: ' '.join(sorted([
@@ -167,6 +173,7 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
     all_game_teams = games_filtered['Team'].apply(lambda x: ' '.join(sorted(str(x)))).tolist()
 
     # Ensure all elements are strings
+    all_game_titles = [str(summary) for summary in all_game_titles]
     summaries_all_games = [str(summary) for summary in summaries_all_games]
     all_game_terms = [str(terms) for terms in all_game_terms]
     all_game_teams = [str(team) for team in all_game_teams]
@@ -203,6 +210,13 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         display_results(top5)
     else:
         client = InferenceClient()
+
+        # Get similarities for titles
+        title_similarities = client.sentence_similarity(
+            selected_game_title,
+            other_sentences=all_game_titles,
+            model='sentence-transformers/all-MiniLM-L6-v2'
+        )
         
         # Get similarities for summaries
         summary_similarities = client.sentence_similarity(
@@ -227,7 +241,7 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         
         # Find the best weights
         best_avg_weights, best_max_weights, best_avg_similarity, best_max_similarity = find_best_weights(
-            summary_similarities, terms_similarities, team_similarities, games_filtered
+            title_similarities, summary_similarities, terms_similarities, team_similarities, games_filtered
         )
         
         # Display results
@@ -235,8 +249,9 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         st.write(f'Best weight combination for max similarity: {best_max_weights}, Max Similarity: {best_max_similarity}')
         
         # Use the best weights (for example, based on average similarity) to compute final similarities
-        summary_weight, terms_weight, team_weight = best_avg_weights
-        final_similarity = (summary_weight * np.array(summary_similarities) +
+        title_weight, summary_weight, terms_weight, team_weight = best_avg_weights
+        final_similarity = (title_weight * np.array(title_similarities) +
+                            summary_weight * np.array(summary_similarities) +
                             terms_weight * np.array(terms_similarities) +
                             team_weight * np.array(team_similarities))
         
