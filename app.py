@@ -223,9 +223,9 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         )
         
         # Combine similarity scores
-        final_similarity = (0.4 * np.array(summary_similarities) +
-                            0.45 * np.array(terms_similarities) +
-                            0.15 * np.array(team_similarities))
+        final_similarity = (0.1 * np.array(summary_similarities) +
+                            0.35 * np.array(terms_similarities) +
+                            0.55 * np.array(team_similarities))
         
         # Add final similarity scores back to the DataFrame
         games_filtered['similarity'] = final_similarity.tolist()
