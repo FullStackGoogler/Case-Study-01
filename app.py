@@ -92,7 +92,7 @@ def find_best_weights(title_similiarities, summary_similarities, terms_similarit
     best_max_weights = None
     
     # Generate all combinations of weights that sum to 1
-    for title_weight, summary_weight, terms_weight, team_weight in product(weights_range, repeat=3):
+    for title_weight, summary_weight, terms_weight, team_weight in product(weights_range, repeat=4):
         if np.isclose(title_weight + summary_weight + terms_weight + team_weight, 1.0):
             # Compute final similarity score for the current weight combination
             final_similarity = (title_weight * np.array(title_similiarities) +
