@@ -245,8 +245,8 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         )
         
         # Display results
-        st.write(f'Best weight combination for average similarity: {best_avg_weights}, Average Similarity: {best_avg_similarity}')
-        st.write(f'Best weight combination for max similarity: {best_max_weights}, Max Similarity: {best_max_similarity}')
+        # st.write(f'Best weight combination for average similarity: {best_avg_weights}, Average Similarity: {best_avg_similarity}')
+        # st.write(f'Best weight combination for max similarity: {best_max_weights}, Max Similarity: {best_max_similarity}')
         
         # Use the best weights (for example, based on average similarity) to compute final similarities
         title_weight, summary_weight, terms_weight, team_weight = best_avg_weights
@@ -313,6 +313,10 @@ if st.session_state.stage > 0:
     if len(filtered) == 1:
         st.write('Is this the game you selected?')
         st.write(filtered.Title.item() + ' - ' + filtered.Team.item())
+    
+        header_image_url = filtered['Header image'].item()
+        if header_image_url:  # Ensure there's an image to display
+            st.image(header_image_url, caption=filtered.Title.item(), use_column_width=True)
 
         # buttons of yes/no to confirm are created side by side using columns
         col1, col2 = st.columns(2)
