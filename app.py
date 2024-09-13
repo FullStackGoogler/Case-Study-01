@@ -82,7 +82,7 @@ def display_results(top5):
         # Add a horizontal line for separation between results
         st.markdown("---")
 
-def find_best_weights(title_similiarities, summary_similarities, category_similarities, genre_similarities, tags_similarities, team_similarities, games_filtered):
+def find_best_weights(title_similarities, summary_similarities, category_similarities, genre_similarities, tags_similarities, team_similarities, games_filtered):
     # Define possible values for weights
     weights_range = np.arange(0, 1.1, 0.1)  # [0, 0.1, 0.2, ..., 1.0]
     
