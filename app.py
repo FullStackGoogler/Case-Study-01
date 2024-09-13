@@ -140,7 +140,7 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
     result = data_filtered
 
     # Get game title
-    selected_game_title = str(result.Name.item())
+    selected_game_title = str(result.Title.item())
 
     # Combine terms from Categories, Genres, and Tags columns
     selected_game_terms = ' '.join(sorted([
