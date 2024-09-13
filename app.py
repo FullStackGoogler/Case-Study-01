@@ -11,20 +11,8 @@ import torch.nn.functional as F
 from sentence_transformers import SentenceTransformer, util
 
 from huggingface_hub import InferenceClient
-from transformers import AutoTokenizer, AutoModel
 
-import requests
-
-import os
-
-api_key = os.getenv("API_KEY")
-# API URL and headers
-client = InferenceClient(api_key=api_key)
-model_name = 'all-MiniLM-L6-v2'
-
-def get_embeddings(text):
-    response = client.model(model_name=model_name, inputs=text)
-    return response['embeddings']
+from itertools import product
 
 # Helper Functions
 
@@ -94,23 +82,38 @@ def display_results(top5):
         # Add a horizontal line for separation between results
         st.markdown("---")
 
-def get_embedding_from_api(text, api_url, headers):
-    # Prepare the payload
-    payload = {"inputs": {"text": text}}
+def find_best_weights(summary_similarities, terms_similarities, team_similarities, games_filtered):
+    # Define possible values for weights
+    weights_range = np.arange(0, 1.1, 0.1)  # Example: [0, 0.1, 0.2, ..., 1.0]
     
-    # Send the request
-    response = requests.post(api_url, headers=headers, json=payload)
+    best_avg_similarity = 0
+    best_max_similarity = 0
+    best_avg_weights = None
+    best_max_weights = None
     
-    # Debugging: Print payload and response
-    print(f"Payload: {payload}")
-    print(f"Response Status Code: {response.status_code}")
-    print(f"Response Text: {response.text}")
+    # Generate all combinations of weights that sum to 1
+    for summary_weight, terms_weight, team_weight in product(weights_range, repeat=3):
+        if np.isclose(summary_weight + terms_weight + team_weight, 1.0):
+            # Compute final similarity score for the current weight combination
+            final_similarity = (summary_weight * np.array(summary_similarities) +
+                                terms_weight * np.array(terms_similarities) +
+                                team_weight * np.array(team_similarities))
+            
+            # Calculate average and max similarity score
+            avg_similarity = np.mean(final_similarity)
+            max_similarity = np.max(final_similarity)
+            
+            # Check if this combination produces a higher average similarity
+            if avg_similarity > best_avg_similarity:
+                best_avg_similarity = avg_similarity
+                best_avg_weights = (summary_weight, terms_weight, team_weight)
+            
+            # Check if this combination produces a higher max similarity
+            if max_similarity > best_max_similarity:
+                best_max_similarity = max_similarity
+                best_max_weights = (summary_weight, terms_weight, team_weight)
     
-    # Handle errors
-    if response.status_code != 200:
-        raise ValueError(f"API request failed: {response.status_code} - {response.text}")
-    
-    return response.json()  # This will return the embedding from the API
+    return best_avg_weights, best_max_weights, best_avg_similarity, best_max_similarity
 
 #@st.cache_resource
 def calculate_similarities(name, data_original, data_filtered, use_local_model):
@@ -222,10 +225,20 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
             model='sentence-transformers/all-MiniLM-L6-v2'
         )
         
-        # Combine similarity scores
-        final_similarity = (0.1 * np.array(summary_similarities) +
-                            0.35 * np.array(terms_similarities) +
-                            0.55 * np.array(team_similarities))
+        # Find the best weights
+        best_avg_weights, best_max_weights, best_avg_similarity, best_max_similarity = find_best_weights(
+            summary_similarities, terms_similarities, team_similarities, games_filtered
+        )
+        
+        # Display results
+        st.write(f'Best weight combination for average similarity: {best_avg_weights}, Average Similarity: {best_avg_similarity}')
+        st.write(f'Best weight combination for max similarity: {best_max_weights}, Max Similarity: {best_max_similarity}')
+        
+        # Use the best weights (for example, based on average similarity) to compute final similarities
+        summary_weight, terms_weight, team_weight = best_avg_weights
+        final_similarity = (summary_weight * np.array(summary_similarities) +
+                            terms_weight * np.array(terms_similarities) +
+                            team_weight * np.array(team_similarities))
         
         # Add final similarity scores back to the DataFrame
         games_filtered['similarity'] = final_similarity.tolist()
