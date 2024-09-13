@@ -316,7 +316,7 @@ if st.session_state.stage > 0:
     
         header_image_url = filtered['Header image'].item()
         if header_image_url:  # Ensure there's an image to display
-            st.image(header_image_url, caption=filtered.Title.item(), use_column_width=True)
+            st.image(header_image_url, caption=filtered.Title.item())
 
         # buttons of yes/no to confirm are created side by side using columns
         col1, col2 = st.columns(2)
