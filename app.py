@@ -250,9 +250,9 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         
         # Use the best weights (for example, based on average similarity) to compute final similarities
         title_weight, summary_weight, terms_weight, team_weight = best_avg_weights
-        final_similarity = (1 * np.array(title_similarities) +
+        final_similarity = (0 * np.array(title_similarities) +
                             0 * np.array(summary_similarities) +
-                            0 * np.array(terms_similarities) +
+                            1 * np.array(terms_similarities) +
                             0 * np.array(team_similarities))
         
         # Add final similarity scores back to the DataFrame
