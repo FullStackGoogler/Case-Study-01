@@ -130,8 +130,10 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
     print(f"Number of games with at least 500 recommendations: {rec_count}")
     
     # Filter games from the last 5 years
-    five_years_before = datetime.now().year - 2
-    games_filtered = data_original.query(f'year > {five_years_before}')
+    #five_years_before = datetime.now().year - 2
+    #games_filtered = data_original.query(f'year > {five_years_before}')
+
+    games_filtered = data_original
 
     result = data_filtered
 
