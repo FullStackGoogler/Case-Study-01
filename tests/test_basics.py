@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from your_script import data_processing  # Adjust import based on your script name
+from app import data_processing, calculate_similarities  # Adjust import based on your script name
 
 def test_data_processing():
     # Run data_processing function
