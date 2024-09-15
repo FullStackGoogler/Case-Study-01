@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime
-# Im a test comment!!!
+
 import re
 import streamlit as st
 import streamlit.components.v1 as components
@@ -198,7 +198,7 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         similarity_teams = util.pytorch_cos_sim(embedding_team, embeddings_teams)
     
         # Combine similarity scores
-        final_similarity = (0.4 * similarity_summaries + 0.45 * similarity_terms + 0.15 * similarity_teams) # TODO: Tinker around with these weights more?
+        final_similarity = (0.4 * similarity_summaries + 0.4 * similarity_terms + 0.2 * similarity_teams) # TODO: Tinker around with these weights more?
         
         # Add final similarity scores back to the DataFrame
         games_filtered['similarity'] = final_similarity[0].tolist()
