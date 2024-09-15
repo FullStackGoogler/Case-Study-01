@@ -17,4 +17,4 @@ jobs:
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_Token }}
-        run: git push https://FullStackGoogler:$HF_Token@huggingface.co/spaces/FullStackGoogler/GGGoNext
+        run: git push https://FullStackGoogler:$HF_TOKEN@huggingface.co/spaces/FullStackGoogler/GGGoNext
