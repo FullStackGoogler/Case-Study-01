@@ -14,8 +14,7 @@ from huggingface_hub import InferenceClient
 
 from itertools import product
 
-# Helper Functions
-
+# Preprocess data in the CSV file
 @st.cache_data
 def data_processing():
     games = pd.read_csv('games.csv')
@@ -45,12 +44,6 @@ def data_processing():
     # Handle apostrophes in titles
     games['fixed_title'] = games['Title'].astype(str).str.replace(r"'", "", regex=True)
     
-    # Debugging types & sample values
-    print("Columns and their types:")
-    print(games.dtypes)
-    print("\nSample values:")
-    print(games.head())
-    
     # Convert release dates
     games['Release Date'] = pd.to_datetime(games['Release Date'], errors='coerce')
     
@@ -61,15 +54,9 @@ def data_processing():
     games = games.dropna(subset=['year'])
     games = games[games['Release Date'].notnull()]
     
-    # Keep only games released in the last 5 years
-    #five_years_before = datetime.now().year - 4
-    #games = games[games['year'] > five_years_before]
-    #recent_count = len(games)
-
-    #print(f"Number of games released within the last 4 years: {recent_count}")
-    
     return games
 
+# Helper function for displaying the most similar resutls using Streamlit's functions
 def display_results(top5):
     for index, row in top5.iterrows():
         st.markdown(f"### **{row['Title']}** ({row['similarity']:.2f})")
@@ -82,7 +69,8 @@ def display_results(top5):
         # Add a horizontal line for separation between results
         st.markdown("---")
 
-def find_best_weights(title_similiarities, summary_similarities, terms_similarities, team_similarities, games_filtered):
+# Hypertuning helper function to test similarity weight combinations
+def find_best_weights(title_similiarities, summary_similarities, terms_similarities, team_similarities, games_filtered): # TODO: Seemingly always converges to a value of 1.0 for tags; look into tweaking the starting weights?
     # Define possible values for weights
     weights_range = np.arange(0, 1.1, 0.1)  # [0, 0.1, 0.2, ..., 1.0]
     
@@ -104,22 +92,23 @@ def find_best_weights(title_similiarities, summary_similarities, terms_similarit
             avg_similarity = np.mean(final_similarity)
             max_similarity = np.max(final_similarity)
             
-            # Check if this combination produces a higher average similarity
             if avg_similarity > best_avg_similarity:
                 best_avg_similarity = avg_similarity
                 best_avg_weights = (title_weight, summary_weight, terms_weight, team_weight)
-            
-            # Check if this combination produces a higher max similarity
+
             if max_similarity > best_max_similarity:
                 best_max_similarity = max_similarity
                 best_max_weights = (title_weight, summary_weight, terms_weight, team_weight)
     
     return best_avg_weights, best_max_weights, best_avg_similarity, best_max_similarity
 
+# Function to calculate the most similar games for a given game
 #@st.cache_resource
 def calculate_similarities(name, data_original, data_filtered, use_local_model):
-    # Drop the game that were selected
+    # Drop the selected game
     data_original.drop(data_original.query('Title == @name').index, inplace=True)
+
+    # Filter the remaining games to include "good" games, as well as eliminate any older games
 
     # Keep games that have a rating of at least 85%
     data_original['positive_rating_percentage'] = data_original['Positive'] / (data_original['Positive'] + data_original['Negative']) * 100
@@ -130,12 +119,12 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
     data_original = data_original[data_original['Recommendations'] > 500]
     rec_count = len(data_original)
 
-    print(f"Number of games with a rating of at least 85%: {remaining_count}")
-    print(f"Number of games with at least 500 recommendations: {rec_count}")
+    # print(f"Number of games with a rating of at least 85%: {remaining_count}")
+    # print(f"Number of games with at least 500 recommendations: {rec_count}")
     
-    # Filter games from the last 5 years
-    five_years_before = datetime.now().year - 3
-    games_filtered = data_original.query(f'year > {five_years_before}')
+    # Filter games from the last X years
+    years_before = datetime.now().year - 3
+    games_filtered = data_original.query(f'year > {years_before}')
 
     result = data_filtered
 
@@ -143,7 +132,7 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
     selected_game_title = str(result.Title.item())
 
     # Combine terms from Categories, Genres, and Tags columns
-    selected_game_terms = ' '.join(sorted([
+    selected_game_terms = ' '.join(sorted([ # TODO: Consider running similarity scores instead for each of these columns separately?
         str(result.Categories.item()),
         str(result.Genres.item()),
         str(result.Tags.item())
@@ -170,6 +159,7 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         ])),
         axis=1
     ).tolist()
+    
     all_game_teams = games_filtered['Team'].apply(lambda x: ' '.join(sorted(str(x)))).tolist()
 
     # Ensure all elements are strings
@@ -178,8 +168,7 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
     all_game_terms = [str(terms) for terms in all_game_terms]
     all_game_teams = [str(team) for team in all_game_teams]
 
-    if use_local_model:
-        # Run the model
+    if use_local_model: # Locally run product
         model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
         
         # Compute embeddings for each part
@@ -203,12 +192,12 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
         # Add final similarity scores back to the DataFrame
         games_filtered['similarity'] = final_similarity[0].tolist()
         
-        # Order the DataFrame based on the similarity scores
         top5 = games_filtered.sort_values(by='similarity', ascending=False)[:5]
         
         st.write(f'\n These are the 5 most similar games to {name}:')
+        
         display_results(top5)
-    else:
+    else: # API based product
         client = InferenceClient()
 
         # Get similarities for titles
@@ -244,40 +233,36 @@ def calculate_similarities(name, data_original, data_filtered, use_local_model):
             title_similarities, summary_similarities, terms_similarities, team_similarities, games_filtered
         )
         
-        # Display results
         # st.write(f'Best weight combination for average similarity: {best_avg_weights}, Average Similarity: {best_avg_similarity}')
         # st.write(f'Best weight combination for max similarity: {best_max_weights}, Max Similarity: {best_max_similarity}')
-        
-        # Use the best weights (for example, based on average similarity) to compute final similarities
+
         title_weight, summary_weight, terms_weight, team_weight = best_avg_weights
+        
         final_similarity = (0 * np.array(title_similarities) +
                             0 * np.array(summary_similarities) +
                             1 * np.array(terms_similarities) +
                             0 * np.array(team_similarities))
-        
-        # Add final similarity scores back to the DataFrame
+
         games_filtered['similarity'] = final_similarity.tolist()
         
-        # Order the DataFrame based on the similarity scores
         top5 = games_filtered.sort_values(by='similarity', ascending=False)[:5]
         
         st.write(f'\n These are the 5 most similar games to {name}:')
+        
         display_results(top5)
 
 # Application
-
 st.set_page_config(layout="wide")
-
-# Title! 
 st.title("GG Go Next!")
 
 # Sidebar
 with st.sidebar:
     st.header("🎮")
-    st.write("Select a game from the dropdown menu, and the app will calculate the five games most similar to the selected game that were released recently! *Note that it does a few seconds to crunch the results.*")
-    st.sidebar.info("This application was originally a project from Elisa Ribeiro, whose repo can be found here: [GitHub repo](https://github.com/ElisaRMA). I have since added my own improvements to the algorithm, updated the dataset used, and tweaked the UI.",icon="ℹ️")
+    st.write("Select a game from the dropdown menu, and the app will calculate five recently released games most similar to the selected game! *Note that it does a few seconds to crunch the results.*")
+    st.sidebar.info("This application was originally a project from Elisa Ribeiro, whose repo can be found [here](https://github.com/ElisaRMA). I have since improved the algorithm used to determine the results, and updated the dataset to better capture all the games on Steam.",icon="ℹ️")
 
-    use_local_model = st.checkbox("Use Local Model", value=False)
+    # Toggle for whether to use the API, or run it locally
+    use_local_model = st.checkbox("Use Local Model", value=False) # TODO: Make sure that selecting this box during calculations doesn't mess anything up
 
 # keeping track of session_state so buttons can be used inside multiple conditionals
 def set_stage(stage):
@@ -290,7 +275,7 @@ games = data_processing()
 
 # Selection Box
 option = st.selectbox(
-    'Select a game',
+    'Select a Game',
     games.Title.sort_values().unique(), placeholder="Choose your game", index=None)
 
 find_me = st.button("Find a similar game!",on_click=set_stage, args=(1,)) # Set stage to 1
@@ -329,7 +314,7 @@ if st.session_state.stage > 0:
         # after clicking on yes/no the the session_state.stage will be larger than 1 (2 for button1 and 3 for button3.
     
         if st.session_state.stage > 1 and button1:
-            st.write(f'\n Calculating similarities between {option} and other games released in the past 2 years...\n\n\n')
+            st.write(f'\n Calculating similarities between {option} and other games released in the past 3 years...\n\n\n')
             calculate_similarities(option, games, filtered, use_local_model)
 
 
