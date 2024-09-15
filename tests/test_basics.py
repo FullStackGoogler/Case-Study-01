@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from ..app import data_processing, calculate_similarities
+from ../app import data_processing, calculate_similarities
 
 def test_data_processing():
     result = data_processing()
