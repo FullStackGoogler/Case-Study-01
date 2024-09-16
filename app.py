@@ -19,8 +19,6 @@ from itertools import product
 def data_processing():
     games = pd.read_csv('games.csv')
 
-    print(games.columns)
-
     # Remove any games with the "Sexual Content" tag
     initial_count = len(games)
     games = games[~games['Tags'].str.contains('Sexual Content', na=False)]
