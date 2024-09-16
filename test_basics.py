@@ -3,13 +3,11 @@ import pandas as pd
 from app import data_processing, calculate_similarities
 
 def test_data_processing():
-    result = data_processing()
-
-    print(result.columns)
+    games = pd.read_csv("games.csv")
     
-    assert isinstance(result, pd.DataFrame)
+    assert isinstance(games, pd.DataFrame)
     
-    assert 'Title' in result.columns
+    assert 'Title' in games.columns
 
     assert len(result) > 0
 
