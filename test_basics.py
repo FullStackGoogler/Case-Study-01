@@ -4,6 +4,8 @@ from app import data_processing, calculate_similarities
 
 def test_data_processing():
     result = data_processing()
+
+    print(result.columns)
     
     assert isinstance(result, pd.DataFrame)
     
