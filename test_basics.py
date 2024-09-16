@@ -3,6 +3,7 @@ import pandas as pd
 from app import data_processing, calculate_similarities
 
 def test_data_processing():
+    # TODO: This is causing a problem with KeyError: Tag?
     games = pd.read_csv("games.csv")
     
     assert isinstance(games, pd.DataFrame)
