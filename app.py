@@ -14,6 +14,14 @@ from huggingface_hub import InferenceClient
 
 from itertools import product
 
+from prometheus_client import start_http_server, Counter, Summary
+
+# Prometheus metrics
+REQUEST_COUNTER = Counter('app_requests_total', 'Total number of requests')
+SUCCESSFUL_REQUESTS = Counter('app_successful_requests_total', 'Total number of successful requests')
+FAILED_REQUESTS = Counter('app_failed_requests_total', 'Total number of failed requests')
+REQUEST_DURATION = Summary('app_request_duration_seconds', 'Time spent processing request')
+
 # Preprocess data in the CSV file
 @st.cache_data
 def data_processing():
@@ -280,6 +288,9 @@ option = st.selectbox(
 
 find_me = st.button("Find a similar game!",on_click=set_stage, args=(1,)) # Set stage to 1
 
+REQUEST_COUNTER.inc()  # Increment request counter
+request_timer = REQUEST_DURATION.time()  # Start timing the request
+
 # if session state is larger then one, meaning, the user clicked on the "Find a similar game!" button
 # at this point, session_state.stage is equal to one
 if st.session_state.stage > 0:
@@ -294,53 +305,61 @@ if st.session_state.stage > 0:
 
     filtered = games.loc[games['fixed_title'] == option]
     
-    # some testing on the filtered data so the user can confirm the game # TODO: Likely not needed
-    if len(filtered) == 1:
-        st.write('Is this the game you selected?')
-        st.write(filtered.Title.item() + ' - ' + filtered.Team.item())
-    
-        header_image_url = filtered['Header image'].item()
-        if header_image_url:  # Ensure there's an image to display
-            st.image(header_image_url, caption=filtered.Title.item())
+    try:
+        # some testing on the filtered data so the user can confirm the game # TODO: Likely not needed
+        if len(filtered) == 1:
+            st.write('Is this the game you selected?')
+            st.write(filtered.Title.item() + ' - ' + filtered.Team.item())
+        
+            header_image_url = filtered['Header image'].item()
+            if header_image_url:  # Ensure there's an image to display
+                st.image(header_image_url, caption=filtered.Title.item())
 
-        # buttons of yes/no to confirm are created side by side using columns
-        col1, col2 = st.columns(2)
-        with col1:
-            button1 = st.button('Yes', use_container_width=True, on_click=set_stage, args=(2,))
+            # buttons of yes/no to confirm are created side by side using columns
+            col1, col2 = st.columns(2)
+            with col1:
+                button1 = st.button('Yes', use_container_width=True, on_click=set_stage, args=(2,))
 
-        with col2:
-            button2 = st.button('No',use_container_width=True, on_click=set_stage, args=(3,))
+            with col2:
+                button2 = st.button('No',use_container_width=True, on_click=set_stage, args=(3,))
 
-        # after clicking on yes/no the the session_state.stage will be larger than 1 (2 for button1 and 3 for button3.
-    
-        if st.session_state.stage > 1 and button1:
-            st.write(f'\n Calculating similarities between {option} and other games released in the past 3 years...\n\n\n')
-            calculate_similarities(option, games, filtered, use_local_model)
+            # after clicking on yes/no the the session_state.stage will be larger than 1 (2 for button1 and 3 for button3.
+        
+            if st.session_state.stage > 1 and button1:
+                st.write(f'\n Calculating similarities between {option} and other games released in the past 3 years...\n\n\n')
+                calculate_similarities(option, games, filtered, use_local_model)
 
 
-        elif st.session_state.stage > 1 and button2:
-            st.write('\n Please, check the name and try again')
+            elif st.session_state.stage > 1 and button2:
+                st.write('\n Please, check the name and try again')
+                
+                # reset everything to initial step
+                set_stage(0)
+
+        # TODO: Is this case needed if I just properly remove duplicates?
+        # if there is two games with the same name in the dataset (e.g. cases like remakes), user will be asked to select which game (which year/team)
+        elif len(filtered) > 1:
+            indexes = filtered.index.tolist()
+            st.write('\n We found more than one match: \n')
+            st.write(f'Please, select the index\n')
+            st.write(filtered[['Title', 'Release Date', 'Team']])
+            user_selection = st.selectbox(label='Select the index', options=indexes,index=None)
             
-            # reset everything to initial step
-            set_stage(0)
+            # If they click submit session stage will be set to 4
+            submit = st.button("Submit",on_click=set_stage, args=(4,))
+            
+            # If it is larger than 3, then calculate the similarity with the new selected game
+            if st.session_state.stage > 3:
+                filtered_fixed = filtered.loc[[user_selection]]
 
-    # TODO: Is this case needed if I just properly remove duplicates?
-    # if there is two games with the same name in the dataset (e.g. cases like remakes), user will be asked to select which game (which year/team)
-    elif len(filtered) > 1:
-        indexes = filtered.index.tolist()
-        st.write('\n We found more than one match: \n')
-        st.write(f'Please, select the index\n')
-        st.write(filtered[['Title', 'Release Date', 'Team']])
-        user_selection = st.selectbox(label='Select the index', options=indexes,index=None)
-        
-        # If they click submit session stage will be set to 4
-        submit = st.button("Submit",on_click=set_stage, args=(4,))
-        
-        # If it is larger than 3, then calculate the similarity with the new selected game
-        if st.session_state.stage > 3:
-            filtered_fixed = filtered.loc[[user_selection]]
+                st.dataframe(filtered_fixed[['Title', 'Release Date', 'Team']])
+            
+                st.write(f'\n Now, we will calculate similarities between {option} and other games from the last 3 years. Please wait...\n\n\n')
+                calculate_similarities(option, games, filtered_fixed, use_local_model)
 
-            st.dataframe(filtered_fixed[['Title', 'Release Date', 'Team']])
-        
-            st.write(f'\n Now, we will calculate similarities between {option} and other games from the last 3 years. Please wait...\n\n\n')
-            calculate_similarities(option, games, filtered_fixed, use_local_model)
+        SUCCESSFUL_REQUESTS.inc()  # Increment successful request counter
+    except Exception as e:
+        FAILED_REQUESTS.inc()  # Increment failed request counter
+        yield history + [(message, f"Error: {str(e)}")]
+    finally:
+        request_timer.observe_duration()  # Stop timing the request
